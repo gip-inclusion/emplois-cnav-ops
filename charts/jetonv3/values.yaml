@@ -1,0 +1,69 @@
+# Default values for jetonv3
+
+replicaCount: 1
+
+image:
+  repository: rg.fr-par.scw.cloud/emplois-cnav-registry/sj-jetonv3
+  pullPolicy: Always
+  tag: "latest"
+
+imagePullSecrets:
+  - name: scaleway-registry
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  # 1001 = the "gipmds" user that owns the SuiteJeton install and the shared config/audit dirs
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  # jetonv3 Apache vhost listens on 9090 (plain HTTP) / health CGI on 19090
+  port: 9090
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Volume mounts : config is read-only for jetonv3 (shared with ihm-web, which owns it rw)
+# "logs" maps to the dedicated per-service audit PVC, mounted rw at the SuiteJeton audit dir
+volumes:
+  config:
+    enabled: true
+    claimName: interops-config
+    mountPath: /home/gipmds/SuiteJeton.conf
+    readOnly: true
+  logs:
+    enabled: true
+    claimName: jetonv3-audit
+    mountPath: /home/gipmds/SuiteJeton.audit
+    readOnly: false
+
+env: []
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

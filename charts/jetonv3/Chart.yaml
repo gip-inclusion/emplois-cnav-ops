@@ -1,0 +1,13 @@
+apiVersion: v2
+name: jetonv3
+description: SOAP message signing and wrapping service for InterOPS
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - interops
+  - cnav
+  - jeton
+  - soap
+maintainers:
+  - name: GIP Inclusion
