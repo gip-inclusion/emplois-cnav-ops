@@ -1,0 +1,9 @@
+# Reloader wrapper chart values
+
+reloader:
+  reloader:
+    # Patch a pod-template annotation instead of an env var: plays nice with ArgoCD
+    # (the interops-apps ApplicationSet ignores that annotation, cf. charts/argocd)
+    reloadStrategy: annotations
+    # Only reload the workloads that opt in through the reloader.stakater.com annotations
+    autoReloadAll: false

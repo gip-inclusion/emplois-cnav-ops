@@ -1,0 +1,14 @@
+apiVersion: v2
+name: reloader
+description: Reloader for emplois-cnav, rolls workloads when the Secrets/ConfigMaps change
+type: application
+version: 0.1.0
+keywords:
+  - reloader
+  - secrets
+maintainers:
+  - name: GIP Inclusion
+dependencies:
+  - name: reloader
+    version: "2.2.18"
+    repository: https://stakater.github.io/stakater-charts
