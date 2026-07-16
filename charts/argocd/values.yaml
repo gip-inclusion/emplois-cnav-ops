@@ -1,0 +1,283 @@
+# ArgoCD wrapper chart values
+
+# Use a YAML anchor to define, at this unique location, the Git revision tracked by all Application and ApplicationSet
+targetRevision: &targetRevision main
+
+argocd:
+  # Server configuration
+  server:
+    service:
+      type: ClusterIP
+
+  configs:
+    cm:
+      url: https://argocd.interops-a.inclusion.gouv.fr
+      # No SSO yet: login via the local admin account (argocd-initial-admin-secret)
+      # FIXME(leo): SSO (OIDC) with the PDI Authentik and the group mapping below will come in an upcoming PR
+    rbac:
+      # PDI Authentik group "emplois-cnav-admins" is admin, everyone else has no access
+      # Not even read-only: it shows the rendered manifests and live state, including the SOPS values hidden in this
+      # repository (only secret objects are masked)
+      # FIXME(leo): No effect until SSO (OIDC) is setup
+      policy.csv: |
+        g, emplois-cnav-admins, role:admin
+      policy.default: ""
+
+argocdapps:
+  projects:
+    infra:
+      namespace: argocd
+      description: infra resources
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+      sourceRepos:
+        - https://github.com/gip-inclusion/emplois-cnav-ops.git
+      destinations:
+        - namespace: argocd
+          server: https://kubernetes.default.svc
+        - namespace: ingress
+          server: https://kubernetes.default.svc
+        - namespace: external-secrets
+          server: https://kubernetes.default.svc
+        - namespace: authentik
+          server: https://kubernetes.default.svc
+        - namespace: reloader
+          server: https://kubernetes.default.svc
+      clusterResourceWhitelist:
+        - group: "*"
+          kind: "*"
+
+    apps:
+      namespace: argocd
+      description: interops apps
+      # Warn about the resources of the destination namespaces tracked by no Application, such as the ones left by an
+      # Application deleted by its ApplicationSet (preserveResourcesOnDeletion). ArgoCD never deletes them
+      orphanedResources:
+        warn: true
+        ignore:
+          # Created by hand at bootstrap, not by a chart
+          - kind: Secret
+            name: scaleway-registry
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+      sourceRepos:
+        - https://github.com/gip-inclusion/emplois-cnav-ops.git
+      destinations:
+        - namespace: interops-integration
+          server: https://kubernetes.default.svc
+        - namespace: interops-production
+          server: https://kubernetes.default.svc
+      clusterResourceWhitelist:
+        - group: ''
+          kind: Namespace
+        - group: ''
+          kind: PersistentVolume
+      namespaceResourceWhitelist:
+        - group: cilium.io
+          kind: CiliumNetworkPolicy
+        - group: external-secrets.io
+          kind: ExternalSecret
+        - group: ""
+          kind: Service
+        - group: ""
+          kind: ServiceAccount
+        - group: ""
+          kind: ConfigMap
+        - group: ""
+          kind: PersistentVolumeClaim
+        - group: apps
+          kind: Deployment
+        - group: batch
+          kind: Job
+        - group: networking.k8s.io
+          kind: Ingress
+
+  applications:
+    argocd:
+      namespace: argocd
+      project: infra
+      # ServerSideApply=true switches the diff to a local structured merge, which ignores the CRD defaults
+      # Do the diff with a server-side dry run instead
+      # Refs: https://argo-cd.readthedocs.io/en/stable/user-guide/diff-strategies/#structured-merge-diff
+      additionalAnnotations: &serverSideDiffAnnotations
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/argocd
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        syncOptions:
+          # Argo CD >= 3.3: the ApplicationSet CRD is too large for client-side apply
+          # https://github.com/argoproj/argo-cd/blob/master/docs/operator-manual/upgrading/3.2-3.3.md
+          - ServerSideApply=true
+
+    traefik:
+      namespace: argocd
+      project: infra
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/traefik
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: ingress
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+    external-secrets:
+      namespace: argocd
+      project: infra
+      additionalAnnotations: *serverSideDiffAnnotations
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/external-secrets
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: external-secrets
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+
+    reloader:
+      namespace: argocd
+      project: infra
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/reloader
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: reloader
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+    authentik:
+      namespace: argocd
+      project: infra
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/authentik
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: authentik
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+    interops-integration:
+      namespace: argocd
+      project: apps
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/interops-infra
+        targetRevision: *targetRevision
+        helm:
+          valueFiles:
+            - values.yaml
+            - values-integration.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: interops-integration
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+    interops-production:
+      namespace: argocd
+      project: apps
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/interops-infra
+        targetRevision: *targetRevision
+        helm:
+          valueFiles:
+            - values.yaml
+            - values-production.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: interops-production
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+  applicationsets:
+    interops-apps:
+      namespace: argocd
+      # Deleting the ApplicationSet, or an element of its generators, must not delete the deployed resources
+      syncPolicy: &applicationSetSyncPolicy
+        preserveResourcesOnDeletion: true
+      generators:
+        - matrix:
+            generators:
+              - list:
+                  elements:
+                    - environment: integration
+                      namespace: interops-integration
+                    - environment: production
+                      namespace: interops-production
+              - list:
+                  elements:
+                    - component: ihm-web
+                    - component: jetonv3
+                    - component: interops-a
+                    - component: api-relay
+      template:
+        metadata:
+          name: "{{component}}-{{environment}}"
+        spec:
+          project: apps
+          source:
+            repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+            targetRevision: *targetRevision
+            path: "charts/{{component}}"
+            helm:
+              # Environment-agnostic release name: resources are named per component (the namespace carries
+              # the environment) and the immutable selector label app.kubernetes.io/instance match
+              # the historical manual helm releases
+              releaseName: "{{component}}"
+              valueFiles:
+                - values.yaml
+                - "values-{{environment}}.yaml"
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: "{{namespace}}"
+          # Reloader (reloadStrategy: annotations) triggers rolling updates by patching this pod-template annotation:
+          # ArgoCD must ignore it or selfHeal would revert the restart
+          ignoreDifferences:
+            - group: apps
+              kind: Deployment
+              jqPathExpressions:
+                - .spec.template.metadata.annotations."reloader.stakater.com/last-reloaded-from"
+          syncPolicy:
+            automated:
+              prune: true
+              selfHeal: true
+            syncOptions:
+              - CreateNamespace=false
+              - RespectIgnoreDifferences=true
