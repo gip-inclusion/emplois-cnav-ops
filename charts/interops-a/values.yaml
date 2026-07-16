@@ -1,0 +1,78 @@
+# Default values for interops-a
+
+replicaCount: 1
+
+image:
+  repository: rg.fr-par.scw.cloud/emplois-cnav-registry/sj-interops-a
+  pullPolicy: Always
+  tag: "latest"
+
+imagePullSecrets:
+  - name: scaleway-registry
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  # 1001 = the "gipmds" user that owns the SuiteJeton install and the shared
+  # config/audit dirs (interops-config is populated rw by ihm-web as 1001).
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  # InterOPS-A passerelle: only the IDP module is configured for this deployment
+  # (Apache vhost mod_idp listens on 8081 plain HTTP / health CGI on 18081)
+  # The SP module (9081) is present in the image but unconfigured (no services/hosts)
+  port: 8081
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Volume mounts : config is read-only for InterOPS-A (shared with ihm-web, which owns it rw)
+# "logs" maps to the dedicated per-service audit PVC (InterOPS nomenclature: "audit" are logs),
+# mounted rw at the SuiteJeton audit dir
+volumes:
+  config:
+    enabled: true
+    claimName: interops-config
+    mountPath: /home/gipmds/SuiteJeton.conf
+    readOnly: true
+  logs:
+    enabled: true
+    claimName: interops-a-audit
+    mountPath: /home/gipmds/SuiteJeton.audit
+    readOnly: false
+
+# Environment variables from Kubernetes secret (created by External Secrets)
+envFromSecret:
+  enabled: true
+  secretName: vpn-config
+
+env: []
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
