@@ -1,0 +1,12 @@
+apiVersion: v2
+name: ihm-web
+description: Web administration interface for InterOPS
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - interops
+  - cnav
+  - ihm
+maintainers:
+  - name: GIP Inclusion

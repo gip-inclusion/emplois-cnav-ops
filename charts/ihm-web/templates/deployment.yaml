@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ihm-web.fullname" . }}
+  labels:
+    {{- include "ihm-web.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "ihm-web.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "ihm-web.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ihm-web.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+          {{- with .Values.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.entrypoint.enabled }}
+          command: ["/bin/bash", "{{ .Values.entrypoint.mountPath }}"]
+          args: {{ toYaml .Values.originalCommand | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            {{- if .Values.volumes.config.enabled }}
+            - name: config
+              mountPath: {{ .Values.volumes.config.mountPath }}
+              readOnly: {{ .Values.volumes.config.readOnly }}
+            {{- end }}
+            {{- if .Values.volumes.audit.enabled }}
+            - name: audit
+              mountPath: {{ .Values.volumes.audit.mountPath }}
+              readOnly: {{ .Values.volumes.audit.readOnly }}
+            {{- end }}
+            {{- if .Values.entrypoint.enabled }}
+            - name: entrypoint
+              mountPath: {{ .Values.entrypoint.mountPath }}
+              subPath: entrypoint.sh
+              readOnly: true
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        {{- if .Values.volumes.config.enabled }}
+        - name: config
+          persistentVolumeClaim:
+            claimName: {{ .Values.volumes.config.claimName }}
+        {{- end }}
+        {{- if .Values.volumes.audit.enabled }}
+        - name: audit
+          persistentVolumeClaim:
+            claimName: {{ .Values.volumes.audit.claimName }}
+        {{- end }}
+        {{- if .Values.entrypoint.enabled }}
+        - name: entrypoint
+          configMap:
+            name: {{ include "ihm-web.fullname" . }}-entrypoint
+            defaultMode: 0755
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

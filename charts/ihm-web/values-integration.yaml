@@ -1,0 +1,12 @@
+# Values for integration environment
+
+ingress:
+  hosts:
+    - host: admin.integration.interops-a.inclusion.gouv.fr
+      paths:
+        - path: /
+          pathType: Prefix
+
+env:
+  - name: ENVIRONMENT
+    value: "integration"
