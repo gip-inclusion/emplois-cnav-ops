@@ -1,0 +1,94 @@
+# Authentik wrapper chart values
+
+# Scaleway Secret Manager configuration
+scaleway:
+  secretId: "1433c432-475f-48c9-b38a-7da12faaf89d"
+
+authentik:
+  authentik:
+    error_reporting:
+      enabled: false
+
+  server:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 500Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+    volumes:
+      - name: blueprints-custom
+        configMap:
+          name: authentik-blueprints
+    volumeMounts:
+      - name: blueprints-custom
+        mountPath: /blueprints/custom
+
+  worker:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 600Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+    volumes:
+      - name: blueprints-custom
+        configMap:
+          name: authentik-blueprints
+    volumeMounts:
+      - name: blueprints-custom
+        mountPath: /blueprints/custom
+
+  global:
+    env:
+      - name: AUTHENTIK_SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secrets
+            key: secret_key
+      - name: AUTHENTIK_POSTGRESQL__PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secrets
+            key: postgres_password
+      - name: INCLUSION_CONNECT_CLIENT_ID
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secrets
+            key: inclusion_connect_client_id
+      - name: INCLUSION_CONNECT_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secrets
+            key: inclusion_connect_client_secret
+      - name: INCLUSION_CONNECT_WELL_KNOWN_URL
+        value: "https://connect.inclusion.gouv.fr/auth/.well-known/openid-configuration"
+      - name: AUTHENTIK_BOOTSTRAP_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secrets
+            key: bootstrap_admin_password
+      - name: AUTHENTIK_BOOTSTRAP_EMAIL
+        valueFrom:
+          secretKeyRef:
+            name: authentik-secrets
+            key: bootstrap_admin_email
+
+  postgresql:
+    enabled: true
+    image:
+      tag: "17"
+    auth:
+      username: authentik
+      database: authentik
+      existingSecret: authentik-secrets
+      secretKeys:
+        userPasswordKey: postgres_password
+    primary:
+      persistence:
+        enabled: true
+        existingClaim: authentik-postgresql-data

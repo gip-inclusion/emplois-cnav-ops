@@ -1,0 +1,102 @@
+# Allow Traefik to reach Authentik server
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-traefik-to-authentik
+  namespace: {{ .Release.Namespace }}
+spec:
+  description: "Allow Traefik to reach Authentik server"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: authentik
+      app.kubernetes.io/component: server
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: ingress
+            app.kubernetes.io/name: traefik
+      toPorts:
+        - ports:
+            - port: "9000"
+              protocol: TCP
+            - port: "9443"
+              protocol: TCP
+---
+# Allow internal communication within the namespace
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-internal
+  namespace: {{ .Release.Namespace }}
+spec:
+  description: "Allow internal communication within namespace"
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: {{ .Release.Namespace }}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: {{ .Release.Namespace }}
+---
+# Allow DNS resolution for all pods
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: {{ .Release.Namespace }}
+spec:
+  description: "Allow DNS resolution"
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+---
+# Allow Authentik to reach external services (Inclusion Connect OIDC, etc.)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-external-egress
+  namespace: {{ .Release.Namespace }}
+spec:
+  description: "Allow Authentik to reach external services"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: authentik
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# Allow Authentik to reach Kubernetes API (for outpost management)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-kube-api
+  namespace: {{ .Release.Namespace }}
+spec:
+  description: "Allow Authentik to reach Kubernetes API"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: authentik
+  egress:
+    - toEntities:
+        - kube-apiserver
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "6443"
+              protocol: TCP
