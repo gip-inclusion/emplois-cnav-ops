@@ -1,0 +1,23 @@
+# Helm
+charts/*/charts/
+*.tgz
+
+# Kubernetes
+*.kubeconfig
+kubeconfig
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets (never commit)
+*secret*.yaml
+*secrets*.yaml
+!*secret*example*.yaml
+!externalsecret.yaml
