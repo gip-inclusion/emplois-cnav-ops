@@ -1,0 +1,8 @@
+# Values for integration environment
+
+environment: integration
+
+backoffice:
+  host: backoffice.relay.integration.interops-a.inclusion.gouv.fr
+  # Sign-out endpoint of the outpost: on the auth host (domain-level forward auth, cf. charts/authentik)
+  authentikLogoutUrl: https://auth.interops-a.inclusion.gouv.fr/outpost.goauthentik.io/sign_out
