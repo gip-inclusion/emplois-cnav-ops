@@ -1,0 +1,13 @@
+apiVersion: v2
+name: interops-infra
+description: Namespace, PVCs and NetworkPolicies for InterOPS environment
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - interops
+  - cnav
+  - namespace
+  - networkpolicy
+maintainers:
+  - name: GIP Inclusion

@@ -1,0 +1,63 @@
+# Shared config volume (rw for ihm-web, ro for jetonv3 and interops-a)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: interops-config
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.pvc.config.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.pvc.config.size }}
+---
+# Audit volume for ihm-web
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ihm-web-audit
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.pvc.audit.ihmWeb.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.pvc.audit.ihmWeb.size }}
+---
+# Audit volume for jetonv3
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jetonv3-audit
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.pvc.audit.jetonv3.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.pvc.audit.jetonv3.size }}
+---
+# Audit volume for interops-a
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: interops-a-audit
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.pvc.audit.interopsA.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.pvc.audit.interopsA.size }}
