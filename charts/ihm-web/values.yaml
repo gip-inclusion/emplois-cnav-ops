@@ -1,0 +1,94 @@
+# Default values for ihm-web
+
+replicaCount: 1
+
+image:
+  repository: rg.fr-par.scw.cloud/emplois-cnav-registry/sj-ihm-web
+  pullPolicy: Always
+  tag: "latest"
+
+imagePullSecrets:
+  - name: scaleway-registry
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 8080
+
+containerPort: 8080
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+    traefik.ingress.kubernetes.io/router.middlewares: authentik-authentik-forwardauth@kubernetescrd
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Volume mounts
+volumes:
+  config:
+    enabled: true
+    claimName: interops-config
+    mountPath: /home/gipmds/SuiteJeton.conf
+    readOnly: false
+  audit:
+    enabled: true
+    claimName: ihm-web-audit
+    mountPath: /home/gipmds/SuiteJeton.audit
+    readOnly: false
+
+# Custom entrypoint to disable TLS (handled by Traefik)
+entrypoint:
+  enabled: true
+  mountPath: /entrypoint.sh
+
+# Original command from the Docker image
+originalCommand:
+  - /bin/sh
+  - -c
+  - /home/gipmds/SuiteJeton/bin/ihmweb_deploy && /home/gipmds/SuiteJeton/ihm-web/bin/startup.sh
+
+env: []
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
