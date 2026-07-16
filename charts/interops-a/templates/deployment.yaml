@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "interops-a.fullname" . }}
+  labels:
+    {{- include "interops-a.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "interops-a.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "interops-a.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "interops-a.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          env:
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- if .Values.envFromSecret.enabled }}
+            - name: REMOTE_IP
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.envFromSecret.secretName }}
+                  key: remote_ip
+            - name: LOCAL_IP
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.envFromSecret.secretName }}
+                  key: local_ip
+            {{- end }}
+          volumeMounts:
+            {{- if .Values.volumes.config.enabled }}
+            - name: config
+              mountPath: {{ .Values.volumes.config.mountPath }}
+              readOnly: {{ .Values.volumes.config.readOnly }}
+            {{- end }}
+            {{- if .Values.volumes.logs.enabled }}
+            - name: logs
+              mountPath: {{ .Values.volumes.logs.mountPath }}
+              readOnly: {{ .Values.volumes.logs.readOnly }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        {{- if .Values.volumes.config.enabled }}
+        - name: config
+          persistentVolumeClaim:
+            claimName: {{ .Values.volumes.config.claimName }}
+        {{- end }}
+        {{- if .Values.volumes.logs.enabled }}
+        - name: logs
+          persistentVolumeClaim:
+            claimName: {{ .Values.volumes.logs.claimName }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

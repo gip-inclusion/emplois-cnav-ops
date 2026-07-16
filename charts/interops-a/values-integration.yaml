@@ -1,0 +1,5 @@
+# Values for integration environment
+
+env:
+  - name: ENVIRONMENT
+    value: "integration"
