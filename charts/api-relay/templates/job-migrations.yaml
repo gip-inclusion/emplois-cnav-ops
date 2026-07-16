@@ -1,0 +1,63 @@
+{{- if .Values.migrations.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "api-relay.fullname" . }}-migrations
+  labels:
+    {{- include "api-relay.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrations
+  annotations:
+    # Run before every ArgoCD sync (the previous job is kept for inspection until the next one)
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "api-relay.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migrations
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "api-relay.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: migrations
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - django-admin migrate --no-input && django-admin grant_app_privileges
+          env:
+            {{- include "api-relay.djangoCommonEnv" . | nindent 12 }}
+            # Migrations run with the DDL + DML (job) user, owner of the objects it creates
+            - name: DJANGO_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: api-relay-database
+                  key: jobs_user
+            - name: DJANGO_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: api-relay-database
+                  key: jobs_password
+            # grant_app_privileges then grants DML on the new objects to the app user
+            - name: DJANGO_DB_APP_ROLE
+              valueFrom:
+                secretKeyRef:
+                  name: api-relay-database
+                  key: app_user
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+{{- end }}
