@@ -1,0 +1,16 @@
+apiVersion: v2
+name: traefik
+description: Traefik Ingress Controller for emplois-cnav
+type: application
+version: 0.1.0
+appVersion: "3.0"
+keywords:
+  - traefik
+  - ingress
+  - tls
+maintainers:
+  - name: GIP Inclusion
+dependencies:
+  - name: traefik
+    version: "39.0.0"
+    repository: https://traefik.github.io/charts
