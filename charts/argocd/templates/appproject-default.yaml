@@ -1,0 +1,19 @@
+{{- /* Rendered with the other projects: not at the first bootstrap step, before the AppProject CRD exists */}}
+{{- if .Values.argocdapps.projects }}
+# Lock the default project, which Argo CD creates allowing any source, destination and resource
+# Refs: https://argo-cd.readthedocs.io/en/stable/user-guide/projects/#the-default-project
+# Not in argocdapps.projects: its chart omits empty lists, and with server-side apply an omitted field keeps its value
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: default
+  namespace: {{ .Release.Namespace }}
+spec:
+  sourceRepos: []
+  sourceNamespaces: []
+  destinations: []
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - group: "*"
+      kind: "*"
+{{- end }}
