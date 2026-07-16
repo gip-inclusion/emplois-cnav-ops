@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "api-relay.fullname" . }}-backoffice
+  labels:
+    {{- include "api-relay.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backoffice
+  annotations:
+    # Reloader rolls the pods when the synced secrets change
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "api-relay.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backoffice
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "api-relay.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backoffice
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "api-relay.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: backoffice
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthcheck/live/
+              port: http
+              # The kubelet probes the pod by IP: present the served hostname to pass ALLOWED_HOSTS
+              httpHeaders:
+                - name: Host
+                  value: {{ .Values.backoffice.host }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthcheck/ready/
+              port: http
+              httpHeaders:
+                - name: Host
+                  value: {{ .Values.backoffice.host }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          env:
+            {{- include "api-relay.djangoCommonEnv" . | nindent 12 }}
+            # The pods serve traffic with the DML-only user
+            - name: DJANGO_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: api-relay-database
+                  key: app_user
+            - name: DJANGO_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: api-relay-database
+                  key: app_password
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
