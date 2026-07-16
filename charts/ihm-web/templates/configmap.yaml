@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "ihm-web.fullname" . }}-entrypoint
+  labels:
+    {{- include "ihm-web.labels" . | nindent 4 }}
+data:
+  entrypoint.sh: |
+    #!/bin/bash
+    set -e
+
+    SERVER_XML="/home/gipmds/SuiteJeton/ihm-web/conf/server.xml"
+
+    echo "Disabling TLS in server.xml (TLS termination handled by Traefik)..."
+
+    # Replace port 8443 -> 8080
+    sed -i 's/port="8443"/port="8080"/g' "$SERVER_XML"
+
+    # Disable SSL
+    sed -i 's/scheme="https"/scheme="http"/g' "$SERVER_XML"
+    sed -i 's/secure="true"/secure="false"/g' "$SERVER_XML"
+    sed -i 's/SSLEnabled="true"/SSLEnabled="false"/g' "$SERVER_XML"
+
+    # Remove SSL certificate lines (optional, they're ignored when SSLEnabled=false)
+    sed -i '/SSLCertificateFile=/d' "$SERVER_XML"
+    sed -i '/SSLCertificateKeyFile=/d' "$SERVER_XML"
+    sed -i '/SSLProtocol=/d' "$SERVER_XML"
+    sed -i '/sslImplementationName=/d' "$SERVER_XML"
+
+    echo "server.xml updated successfully"
+
+    # Execute original command
+    exec "$@"
