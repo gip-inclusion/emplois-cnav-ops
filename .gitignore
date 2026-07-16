@@ -24,6 +24,7 @@ Thumbs.db
 *secrets*.yaml
 !*secret*example*.yaml
 !externalsecret.yaml
+!clustersecretstore.yaml
 
 # helm-secrets decrypted output
 *.dec
