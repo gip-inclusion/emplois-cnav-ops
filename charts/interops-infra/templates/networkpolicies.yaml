@@ -1,4 +1,5 @@
 # Allow DNS resolution for all pods
+# Makes every pod egress default-deny
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -44,7 +45,7 @@ spec:
             - port: "8080"
               protocol: TCP
 ---
-# Allow Traefik to reach the api-relay backoffice
+# Allow Traefik to reach api-relay (both components: backoffice via forward-auth, api via ipAllowList)
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -53,7 +54,7 @@ metadata:
   labels:
     {{- include "interops.labels" . | nindent 4 }}
 spec:
-  description: "Allow Traefik to reach the api-relay backoffice"
+  description: "Allow Traefik to reach api-relay (backoffice and api components)"
   endpointSelector:
     matchLabels:
       app.kubernetes.io/name: api-relay
@@ -67,8 +68,7 @@ spec:
             - port: "8000"
               protocol: TCP
 ---
-# Allow api-relay (backoffice pods and migration jobs) to reach the managed PostgreSQL.
-# Egress rule required: every pod is in egress default-deny (allow-dns selects them all, cf. below).
+# Allow api-relay (api+backoffice pods and migration jobs) to reach the managed PostgreSQL
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -89,7 +89,7 @@ spec:
             - port: {{ .Values.database.port | quote }}
               protocol: TCP
 ---
-# Allow api-relay to call interops-a
+# Allow the api-relay API component to call interops-a (the backoffice never does)
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -98,7 +98,7 @@ metadata:
   labels:
     {{- include "interops.labels" . | nindent 4 }}
 spec:
-  description: "Allow api-relay to call interops-a"
+  description: "Allow the api-relay API component to call interops-a"
   endpointSelector:
     matchLabels:
       app.kubernetes.io/name: interops-a
@@ -106,6 +106,30 @@ spec:
     - fromEndpoints:
         - matchLabels:
             app.kubernetes.io/name: api-relay
+            app.kubernetes.io/component: api
+      toPorts:
+        - ports:
+            - port: "8081"
+              protocol: TCP
+---
+# Allow the api-relay API component to call interops-a
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-api-relay-egress-to-interops-a
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  description: "Allow the api-relay API component to call interops-a (egress)"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: api-relay
+      app.kubernetes.io/component: api
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: interops-a
       toPorts:
         - ports:
             - port: "8081"
@@ -133,10 +157,7 @@ spec:
             - port: "9090"
               protocol: TCP
 ---
-# Allow interops-a to call jetonv3 (EGRESS side of the signing call).
-# Cilium puts every pod into egress default-deny as soon as a policy selects it for egress
-# (allow-dns selects all pods and has an egress rule). The ingress rule above (jetonv3 side)
-# is therefore not sufficient: interops-a needs an explicit egress allow to reach jetonv3:9090.
+# Allow interops-a to call jetonv3
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

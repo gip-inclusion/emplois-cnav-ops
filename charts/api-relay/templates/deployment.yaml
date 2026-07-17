@@ -41,27 +41,10 @@ spec:
             - name: http
               containerPort: 8000
               protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /healthcheck/live/
-              port: http
-              # The kubelet probes the pod by IP: present the served hostname to pass ALLOWED_HOSTS
-              httpHeaders:
-                - name: Host
-                  value: {{ .Values.backoffice.host }}
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /healthcheck/ready/
-              port: http
-              httpHeaders:
-                - name: Host
-                  value: {{ .Values.backoffice.host }}
-            initialDelaySeconds: 5
-            periodSeconds: 10
+          {{- include "api-relay.probes" (dict "host" .Values.backoffice.host) | nindent 10 }}
           env:
             {{- include "api-relay.djangoCommonEnv" . | nindent 12 }}
+            {{- include "api-relay.backofficeEnv" . | nindent 12 }}
             # The pods serve traffic with the DML-only user
             - name: DJANGO_DB_USER
               valueFrom:
