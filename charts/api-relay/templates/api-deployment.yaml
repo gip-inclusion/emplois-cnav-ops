@@ -1,24 +1,29 @@
-{{- if .Values.migrations.enabled -}}
-apiVersion: batch/v1
-kind: Job
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: {{ include "api-relay.fullname" . }}-migrations
+  name: {{ include "api-relay.fullname" . }}-api
   labels:
     {{- include "api-relay.labels" . | nindent 4 }}
-    app.kubernetes.io/component: migrations
+    app.kubernetes.io/component: api
   annotations:
-    # Run before every ArgoCD sync (the previous job is kept for inspection until the next one)
-    argocd.argoproj.io/hook: PreSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    # Reloader rolls the pods when the synced secrets change
+    reloader.stakater.com/auto: "true"
 spec:
-  backoffLimit: 0
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "api-relay.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
   template:
     metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
         {{- include "api-relay.selectorLabels" . | nindent 8 }}
-        app.kubernetes.io/component: migrations
+        app.kubernetes.io/component: api
     spec:
-      restartPolicy: Never
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -27,39 +32,44 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: migrations
+        - name: api
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command:
-            - /bin/sh
-            - -c
-            - django-admin migrate --no-input && django-admin grant_app_privileges
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          {{- include "api-relay.probes" (dict "host" .Values.api.host) | nindent 10 }}
           env:
             {{- include "api-relay.djangoCommonEnv" . | nindent 12 }}
-            # Migrations are service-agnostic (run under the BACKOFFICE service)
-            {{- include "api-relay.backofficeEnv" . | nindent 12 }}
-            # Migrations run with the DDL + DML (job) user, owner of the objects it creates
+            {{- include "api-relay.apiEnv" . | nindent 12 }}
+            # The pods serve traffic with the DML-only user
             - name: DJANGO_DB_USER
               valueFrom:
                 secretKeyRef:
                   name: api-relay-database
-                  key: jobs_user
+                  key: app_user
             - name: DJANGO_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: api-relay-database
-                  key: jobs_password
-            # grant_app_privileges then grants DML on the new objects to the app user
-            - name: DJANGO_DB_APP_ROLE
-              valueFrom:
-                secretKeyRef:
-                  name: api-relay-database
-                  key: app_user
+                  key: app_password
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-{{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -61,20 +61,12 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Django environment shared by the backoffice deployment and the migrations job
-The database credentials (user/password) differ between the two and are set by each template
+Django environment common to every pod (backoffice, api, migrations job)
+The database user/password differ per pod and are set by each template
 */}}
 {{- define "api-relay.djangoCommonEnv" -}}
 - name: DJANGO_ENVIRONMENT
   value: "PROD"
-- name: DJANGO_SERVICE
-  value: "BACKOFFICE"
-- name: DJANGO_ALLOWED_HOSTS
-  value: {{ .Values.backoffice.host | quote }}
-- name: DJANGO_CSRF_TRUSTED_ORIGINS
-  value: {{ printf "https://%s" .Values.backoffice.host | quote }}
-- name: DJANGO_AUTHENTIK_LOGOUT_URL
-  value: {{ .Values.backoffice.authentikLogoutUrl | quote }}
 - name: DJANGO_SECRET_KEY
   valueFrom:
     secretKeyRef:
@@ -100,4 +92,72 @@ The database credentials (user/password) differ between the two and are set by e
     secretKeyRef:
       name: api-relay-database
       key: name
+{{- end }}
+
+{{/*
+Backoffice-specific Django env (backoffice deployment + migrations job)
+*/}}
+{{- define "api-relay.backofficeEnv" -}}
+- name: DJANGO_SERVICE
+  value: "BACKOFFICE"
+- name: DJANGO_ALLOWED_HOSTS
+  value: {{ .Values.backoffice.host | quote }}
+- name: DJANGO_CSRF_TRUSTED_ORIGINS
+  value: {{ printf "https://%s" .Values.backoffice.host | quote }}
+- name: DJANGO_AUTHENTIK_LOGOUT_URL
+  value: {{ .Values.backoffice.authentikLogoutUrl | quote }}
+{{- end }}
+
+{{/*
+Health probes shared by both components
+uWSGI takes ~20s to load and the first (cold) request can exceed 1s, so a startupProbe gives room before
+the liveness/readiness take over
+The kubelet probes the pod by IP: the Host header presents the served hostname so the request complies with
+Django's ALLOWED_HOSTS
+*/}}
+{{- define "api-relay.probes" -}}
+startupProbe:
+  httpGet:
+    path: /healthcheck/live/
+    port: http
+    httpHeaders:
+      - name: Host
+        value: {{ .host }}
+  periodSeconds: 3
+  timeoutSeconds: 5
+  failureThreshold: 20
+livenessProbe:
+  httpGet:
+    path: /healthcheck/live/
+    port: http
+    httpHeaders:
+      - name: Host
+        value: {{ .host }}
+  periodSeconds: 10
+  timeoutSeconds: 3
+readinessProbe:
+  httpGet:
+    path: /healthcheck/ready/
+    port: http
+    httpHeaders:
+      - name: Host
+        value: {{ .host }}
+  periodSeconds: 10
+  timeoutSeconds: 3
+{{- end }}
+
+{{/*
+API-specific Django env (api deployment)
+*/}}
+{{- define "api-relay.apiEnv" -}}
+- name: DJANGO_SERVICE
+  value: "API"
+- name: DJANGO_ALLOWED_HOSTS
+  value: {{ .Values.api.host | quote }}
+# Only the API service needs the token hash; the pod never holds the plaintext
+- name: DJANGO_HASHED_API_TOKEN
+  valueFrom:
+    secretKeyRef:
+      name: api-relay-api-token
+      key: hashed_token
 {{- end }}

@@ -43,11 +43,20 @@ backoffice:
   # Where the admin logout redirects (Authentik sign-out), required by the BACKOFFICE service
   authentikLogoutUrl: ""
 
-# The backoffice is behind Traefik + Authentik forwardAuth
+api:
+  # Public hostname of the API: drives DJANGO_ALLOWED_HOSTS and the ingress rule
+  host: ""
+  # Source IP ranges allowed to reach the API: Traefik ipAllowList filters before accessing the app
+  # (the API token stays the primary auth)
+  # Set per environment in a SOPS-encrypted values file (helm-secrets)
+  allowedSourceRanges: []
+
+# Both components (backoffice, api) are ClusterIP behind the shared Traefik LB
 service:
   type: ClusterIP
   port: 8000
 
+# Shared ingress settings: the per-component router.middlewares annotation is set in each ingress template
 ingress:
   enabled: true
   className: traefik
@@ -55,7 +64,6 @@ ingress:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
-    traefik.ingress.kubernetes.io/router.middlewares: authentik-authentik-forwardauth@kubernetescrd
 
 # Secrets pushed by the infrastructure repository into Secret Manager, synced into the namespace by
 # the External Secrets Operator

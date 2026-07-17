@@ -6,3 +6,7 @@ backoffice:
   host: backoffice.relay.integration.interops-a.inclusion.gouv.fr
   # Sign-out endpoint of the outpost: on the auth host (domain-level forward auth, cf. charts/authentik)
   authentikLogoutUrl: https://auth.interops-a.inclusion.gouv.fr/outpost.goauthentik.io/sign_out
+
+api:
+  host: relay.integration.interops-a.inclusion.gouv.fr
+  # api.allowedSourceRanges: set in the SOPS-encrypted values-integration.enc.yaml (helm-secrets)

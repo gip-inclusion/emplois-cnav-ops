@@ -2,24 +2,24 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "api-relay.fullname" . }}-backoffice
+  name: {{ include "api-relay.fullname" . }}-api
   labels:
     {{- include "api-relay.labels" . | nindent 4 }}
   annotations:
     {{- toYaml .Values.ingress.annotations | nindent 4 }}
-    # Authentik forward-auth protects the backoffice
-    traefik.ingress.kubernetes.io/router.middlewares: authentik-authentik-forwardauth@kubernetescrd
+    # Token auth (no forward-auth) + source-IP allowlist middleware (same namespace)
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Release.Namespace }}-{{ include "api-relay.fullname" . }}-ipallowlist@kubernetescrd
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
-    - host: {{ .Values.backoffice.host | quote }}
+    - host: {{ .Values.api.host | quote }}
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: {{ include "api-relay.fullname" . }}-backoffice
+                name: {{ include "api-relay.fullname" . }}-api
                 port:
                   number: {{ .Values.service.port }}
 {{- end }}
