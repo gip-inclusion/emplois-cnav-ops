@@ -1,0 +1,20 @@
+# SOPS configuration for emplois-cnav-ops
+#
+# Recipients are AGE public keys (same keys as the infrastructure repo, so no new key to distribute).
+# Encrypted files are named *.enc.yaml and consumed at deploy time by helm-secrets
+# (helm secrets upgrade ... -f secrets://<file>).
+# The ArgoCD SOPS plugin (ksops/avp) will be added as an extra recipient when ArgoCD drives these deployments.
+#
+# Adding/removing a recipient requires re-wrapping the data key on every encrypted file:
+#   for f in $(git ls-files '*.enc.yaml'); do sops updatekeys --yes "$f"; done
+
+keys:
+  - &francoisfreitag age1tag1q22yv67hk89v390rseukrx3mu5gzw9lpnngla4shn3efhzg2czn7cvdt8y3
+  - &leo-naeka       age1q2w07qws7tw5fhcsnxr33z6588exfnu2dpnsqhhqlvyxc0jf750qgrwv5t
+
+creation_rules:
+  - path_regex: \.enc\.yaml$
+    key_groups:
+      - age:
+          - *francoisfreitag
+          - *leo-naeka
