@@ -5,10 +5,10 @@ metadata:
   name: {{ include "api-relay.fullname" . }}-backoffice
   labels:
     {{- include "api-relay.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+    # Authentik forward-auth protects the backoffice
+    traefik.ingress.kubernetes.io/router.middlewares: authentik-authentik-forwardauth@kubernetescrd
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
