@@ -9,7 +9,7 @@ emplois-cnav-ops/
 ├── charts/
 │   ├── api-relay/                  # Applicatif Django (API REST + backoffice publics)
 │   ├── argocd/                     # ArgoCD + argocd-apps (gère toutes les Applications)
-│   ├── authentik/                  # Authentik (SSO forward-auth via Inclusion Connect)
+│   ├── authentik/                  # Authentik (SSO forward-auth via le SSO de la PDI)
 │   ├── external-secrets/           # External Secrets Operator (gestion des secrets)
 │   ├── ihm-web/                    # Interface d'administration
 │   ├── interops-a/                 # Traitement et envoi vers CNAV
@@ -202,18 +202,17 @@ ArgoCD se synchronisera automatiquement et déploiera :
 La configuration est **entièrement automatisée** via un Blueprint (`templates/blueprint-configmap.yaml`).
 
 Le Blueprint crée automatiquement :
-- La source OAuth/OIDC **Inclusion Connect** (avec property mapping + re-synchro à chaque login)
+- La source OAuth/OIDC du **SSO de la PDI (Authentik également)** (avec property mapping + re-synchro à chaque login)
 - Le Provider Proxy "Forward Auth Domain" (mode domain-level)
 - Les Applications / tuiles de lancement (Interops Admin, API relay backoffice)
 - La politique d'accès `@inclusion.gouv.fr`
 - La configuration de l'Outpost embedded
 
-Les credentials Inclusion Connect (well-known URL, client id/secret) et le compte administrateur par défaut
-sont injectés via le secret `authentik` (Secret Manager).
+Les credentials du SSO de la PDI (well-known URL, client id/secret) et le compte administrateur par défaut sont
+injectés via le secret `authentik` (Secret Manager).
 
-> Note : Authentik protège les **applications** (ihm-web, backoffice api-relay…) via forward-auth +
-> Inclusion Connect. Le login de l'**interface ArgoCD** est pour l'instant le compte admin local
-> (`argocd-initial-admin-secret`).
+> Note : Authentik protège les **applications** (ihm-web, backoffice api-relay…) via forward-auth + le SSO de la PDI.
+> Le login de l'**interface ArgoCD** est pour l'instant le compte admin local (`argocd-initial-admin-secret`).
 
 #### a) Accéder à Authentik
 
@@ -222,7 +221,7 @@ sont injectés via le secret `authentik` (Secret Manager).
 #### b) Vérifier la configuration automatique (Blueprint)
 
 Le Blueprint a créé automatiquement :
-- **Répertoire > Fédération & Connection Sociale** : `Inclusion Connect`
+- **Répertoire > Fédération & Connection Sociale** : `PDI SSO`
 - **Applications > Fournisseurs** : `Forward Auth Domain`
 - **Applications > Applications** : `Interops Admin`, `API relay backoffice`
 - **Applications > Outposts** : `authentik Embedded Outpost` (lié au provider)
@@ -261,7 +260,7 @@ curl -I https://traefik.interops-a.inclusion.gouv.fr
 
 1. Ajouter l'annotation `traefik.ingress.kubernetes.io/router.middlewares: authentik-authentik-forwardauth@kubernetescrd`
    sur l'Ingress
-2. C'est tout ! Le service se retrouve protégé par Inclusion Connect
+2. C'est tout ! Le service se retrouve protégé par le SSO de la PDI
 
 ## Charts Helm
 

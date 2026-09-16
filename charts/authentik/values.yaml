@@ -55,18 +55,18 @@ authentik:
           secretKeyRef:
             name: authentik-secrets
             key: postgres_password
-      - name: INCLUSION_CONNECT_CLIENT_ID
+      - name: PDI_SSO_CLIENT_ID
         valueFrom:
           secretKeyRef:
             name: authentik-secrets
-            key: inclusion_connect_client_id
-      - name: INCLUSION_CONNECT_CLIENT_SECRET
+            key: pdi_sso_client_id
+      - name: PDI_SSO_CLIENT_SECRET
         valueFrom:
           secretKeyRef:
             name: authentik-secrets
-            key: inclusion_connect_client_secret
-      - name: INCLUSION_CONNECT_WELL_KNOWN_URL
-        value: "https://connect.inclusion.gouv.fr/auth/.well-known/openid-configuration"
+            key: pdi_sso_client_secret
+      - name: PDI_SSO_WELL_KNOWN_URL
+        value: "https://connect.inclusion.gouv.fr/application/o/cnav/.well-known/openid-configuration"
       - name: AUTHENTIK_BOOTSTRAP_PASSWORD
         valueFrom:
           secretKeyRef:

@@ -19,34 +19,35 @@ data:
       # Custom OAuth source property mapping: derive username from email + force email/name.
       # In 2026.5 OAuth sources have NO default property mappings; username comes from the
       # hardcoded OpenIDConnectType.get_base_user_properties (nickname|preferred_username), which
-      # Inclusion Connect does not return.
+      # PDI SSO does not return.
       # Empty username causes "select a username" enrollment prompt.
       # Providing username/email/name here makes first-login enrollment fully automatic.
       - model: authentik_sources_oauth.oauthsourcepropertymapping
-        id: ic-user-mapping
+        id: pdi-sso-user-mapping
         state: present
         identifiers:
-          name: Inclusion Connect - user mapping
+          name: PDI SSO - user mapping
         attrs:
-          name: Inclusion Connect - user mapping
+          name: PDI SSO - user mapping
           expression: |
-            # `info` is the upstream OIDC userinfo/id_token claims dict
+            # `info` is the upstream OIDC userinfo/id_token claims dict.
+            # This is the dedicated authentik at connect.inclusion.gouv.fr (application/o/cnav).
+            # It exposes real given_name + family_name via the `profile` scope.
             email = info.get("email")
-            # given_name + family_name come from the OIDC `profile` scope (already requested)
-            given_name = info.get("given_name", "")
-            family_name = info.get("family_name", "")
-            full_name = (given_name + " " + family_name).strip() or email
+            given_name = (info.get("given_name") or "").strip()
+            family_name = (info.get("family_name") or "").strip()
+            full_name = (info.get("name") or "").strip() or (given_name + " " + family_name).strip() or email
             # Group users into folders by email domain (dynamic)
             domain = email.rsplit("@", 1)[-1] if email and "@" in email else "unknown"
             return {
                 # username = email (readable in the admin UI). Returning-user matching relies on
-                # the source connection's sub + email_link, not on this field.
+                # the source connection's sub (user_matching_mode: identifier), not on this field.
                 "username": email,
                 "email": email,
                 "name": full_name,
                 # path = virtual "User folder" (overrides the default goauthentik.io/sources/<slug>)
                 # Mapping-provided path wins over user_path_template (set at enrollment)
-                "path": "inclusion-connect/" + domain,
+                "path": "pdi-sso/" + domain,
                 # The User model has a single `name` field, so keep the individual parts in
                 # attributes (merged, not replaced)
                 # additionalHeaders makes the forward-auth proxy emit them as HTTP headers to backends
@@ -62,95 +63,95 @@ data:
                 },
             }
 
-      # Sync IC user data on every login (SSO = source of truth)
+      # Sync PDI SSO user data on every login (SSO = source of truth)
       # The default source authentication flow only logs the returning user in
       # It does not re-apply the property mapping, so attribute changes (and our additionalHeaders) never
       # refresh after enrollment
       # But handle_auth() puts the mapping output + the linked user into the flow context
-      # So a user_write stage in the authentication flow re-applies ic-user-mapping on each login
+      # So a user_write stage in the authentication flow re-applies pdi-sso-user-mapping on each login
       - model: authentik_flows.flow
-        id: ic-source-auth-flow
+        id: pdi-sso-source-auth-flow
         state: present
         identifiers:
-          slug: inclusion-connect-source-authentication
+          slug: pdi-sso-source-authentication
         attrs:
-          name: Inclusion Connect — synchro + login au retour
-          title: Connexion via Inclusion Connect
+          name: PDI SSO — synchro + login au retour
+          title: Connexion via PDI SSO
           designation: authentication
           authentication: none
 
       - model: authentik_stages_user_write.userwritestage
-        id: ic-source-user-write
+        id: pdi-sso-source-user-write
         state: present
         identifiers:
-          name: inclusion-connect-source-user-write
+          name: pdi-sso-source-user-write
         attrs:
-          name: inclusion-connect-source-user-write
+          name: pdi-sso-source-user-write
           # Update the existing linked user (pending_user is always set on the auth action)
           # create_when_required degrades gracefully (won't block login) but won't create here
           # in practice since the user already exists
           user_creation_mode: create_when_required
-          # Keep IC users external
+          # Keep PDI SSO users external
           user_type: external
 
       # Use its own login stage to avoid a forward reference:
-      # Using ic-user-login (defined below) wouldn't resolve: the importer only resolves entries defined above
+      # Using pdi-sso-user-login (defined below) wouldn't resolve: the importer only resolves entries defined above
       - model: authentik_stages_user_login.userloginstage
-        id: ic-source-user-login
+        id: pdi-sso-source-user-login
         state: present
         identifiers:
-          name: inclusion-connect-source-user-login
+          name: pdi-sso-source-user-login
         attrs:
           session_duration: "seconds=0"
 
       - model: authentik_flows.flowstagebinding
-        id: bind-ic-source-auth-write
+        id: bind-pdi-sso-source-auth-write
         state: present
         identifiers:
-          target: !KeyOf ic-source-auth-flow
-          stage: !KeyOf ic-source-user-write
+          target: !KeyOf pdi-sso-source-auth-flow
+          stage: !KeyOf pdi-sso-source-user-write
           order: 10
         attrs:
           evaluate_on_plan: true
 
       - model: authentik_flows.flowstagebinding
-        id: bind-ic-source-auth-login
+        id: bind-pdi-sso-source-auth-login
         state: present
         identifiers:
-          target: !KeyOf ic-source-auth-flow
-          stage: !KeyOf ic-source-user-login
+          target: !KeyOf pdi-sso-source-auth-flow
+          stage: !KeyOf pdi-sso-source-user-login
           order: 20
         attrs:
           evaluate_on_plan: true
 
-      # Inclusion Connect OAuth Source (generic OIDC)
+      # PDI SSO OAuth Source (generic OIDC)
       - model: authentik_sources_oauth.oauthsource
-        id: inclusion-connect-source
+        id: pdi-sso-source
         state: present
         identifiers:
-          slug: inclusion-connect
+          slug: pdi-sso
         attrs:
-          name: Inclusion Connect
+          name: PDI SSO
           provider_type: openidconnect
           # OIDC auto-discovery: Authentik fetches the well-known doc and fills authorization/token/profile/jwks URLs
-          oidc_well_known_url: !Env [INCLUSION_CONNECT_WELL_KNOWN_URL, ""]
-          consumer_key: !Env [INCLUSION_CONNECT_CLIENT_ID, ""]
-          consumer_secret: !Env [INCLUSION_CONNECT_CLIENT_SECRET, ""]
+          oidc_well_known_url: !Env [PDI_SSO_WELL_KNOWN_URL, ""]
+          consumer_key: !Env [PDI_SSO_CLIENT_ID, ""]
+          consumer_secret: !Env [PDI_SSO_CLIENT_SECRET, ""]
           # Use default enrollment flow which properly handles OAuth data mapping
           enrollment_flow: !Find [authentik_flows.flow, [slug, default-source-enrollment]]
           # Custom auth flow (defined above) re-runs user_write on every login, so user data + additionalHeaders
-          # are re-synced from IC each time
-          authentication_flow: !KeyOf ic-source-auth-flow
-          # Match returning users by their stored source connection (the IC `sub`), never by email:
+          # are re-synced from PDI SSO each time
+          authentication_flow: !KeyOf pdi-sso-source-auth-flow
+          # Match returning users by their stored source connection (the PDI SSO `sub`), never by email:
           # an email change updates the existing user instead of creating a duplicate. New identities enrol
           user_matching_mode: identifier
           group_matching_mode: identifier
           # OpenID is implicit (request email + profile claims)
           additional_scopes: "email profile"
           enabled: true
-          # Derive username/email/name from IC claims so enrollment is automatic (no prompt)
+          # Derive username/email/name from PDI SSO claims so enrollment is automatic (no prompt)
           user_property_mappings:
-            - !KeyOf ic-user-mapping
+            - !KeyOf pdi-sso-user-mapping
 
       # Proxy Provider (Forward Auth Domain Level)
       - model: authentik_providers_proxy.proxyprovider
@@ -308,7 +309,7 @@ data:
 
       # Keep the default authentication flow password-only: it is the fallback path for the local akadmin superuser,
       # reachable directly at /if/flow/default-authentication-flow/
-      # Normal users are auto-redirected to Inclusion Connect by the dedicated flow below
+      # Normal users are auto-redirected to PDI SSO by the dedicated flow below
       - model: authentik_stages_identification.identificationstage
         state: present
         identifiers:
@@ -319,15 +320,15 @@ data:
             - username
           sources: []
 
-      # Auto-redirect authentication flow: Inclusion Connect (avoid displaying Authentik login form)
+      # Auto-redirect authentication flow: PDI SSO (avoid displaying Authentik login form)
       - model: authentik_flows.flow
-        id: flow-ic-redirect
+        id: flow-pdi-sso-redirect
         state: present
         identifiers:
-          slug: inclusion-connect-authentication
+          slug: pdi-sso-authentication
         attrs:
-          name: Inclusion Connect — redirection
-          title: Redirection vers Inclusion Connect
+          name: PDI SSO — redirection
+          title: Redirection vers PDI SSO
           designation: authentication
           authentication: require_unauthenticated
           denied_action: message_continue
@@ -337,53 +338,53 @@ data:
       # Identification stage with NO user_fields + exactly ONE source
       # Authentik auto-redirects straight to that source
       - model: authentik_stages_identification.identificationstage
-        id: ident-ic-only
+        id: ident-pdi-sso-only
         state: present
         identifiers:
-          name: inclusion-connect-identification
+          name: pdi-sso-identification
         attrs:
           user_fields: []
           sources:
-            - !KeyOf inclusion-connect-source
+            - !KeyOf pdi-sso-source
           show_source_labels: true
           case_insensitive_matching: true
 
-      # User Login stage: create the authentik session on return from Inclusion Connect
+      # User Login stage: create the authentik session on return from PDI SSO
       - model: authentik_stages_user_login.userloginstage
-        id: ic-user-login
+        id: pdi-sso-user-login
         state: present
         identifiers:
-          name: inclusion-connect-user-login
+          name: pdi-sso-user-login
         attrs:
           session_duration: "seconds=0"
 
       - model: authentik_flows.flowstagebinding
-        id: bind-ic-ident
+        id: bind-pdi-sso-ident
         state: present
         identifiers:
-          target: !KeyOf flow-ic-redirect
-          stage: !KeyOf ident-ic-only
+          target: !KeyOf flow-pdi-sso-redirect
+          stage: !KeyOf ident-pdi-sso-only
           order: 0
         attrs:
           evaluate_on_plan: true
           re_evaluate_policies: true
 
       - model: authentik_flows.flowstagebinding
-        id: bind-ic-login
+        id: bind-pdi-sso-login
         state: present
         identifiers:
-          target: !KeyOf flow-ic-redirect
-          stage: !KeyOf ic-user-login
+          target: !KeyOf flow-pdi-sso-redirect
+          stage: !KeyOf pdi-sso-user-login
           order: 10
         attrs:
           evaluate_on_plan: true
 
       # Point the default brand's authentication flow at the auto-redirect flow
-      # NOTE: this is global (every login now bounces to Inclusion Connect)
+      # NOTE: this is global (every login now bounces to PDI SSO)
       # For akadmin login: https://auth.interops-a.inclusion.gouv.fr/if/flow/default-authentication-flow/
       - model: authentik_brands.brand
         state: present
         identifiers:
           domain: authentik-default
         attrs:
-          flow_authentication: !Find [authentik_flows.flow, [slug, inclusion-connect-authentication]]
+          flow_authentication: !Find [authentik_flows.flow, [slug, pdi-sso-authentication]]

@@ -61,7 +61,7 @@ spec:
             - port: "53"
               protocol: TCP
 ---
-# Allow Authentik to reach external services (Inclusion Connect OIDC, etc.)
+# Allow Authentik to reach external services (PDI SSO OIDC, etc.)
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
