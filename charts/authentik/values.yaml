@@ -55,6 +55,12 @@ authentik:
           secretKeyRef:
             name: authentik-secrets
             key: postgres_password
+      # 2026.8: authentik only trusts X-Forwarded-* headers from these CIDRs.
+      # Refs: https://docs.goauthentik.io/install-config/reverse-proxy/#trusted-proxy-networks
+      # Cluster pods are in 100.64.0.0/10 (Cilium/Scaleway CGNAT range)
+      # Keep the defaults + the pod CIDR.
+      - name: AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS
+        value: "127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10,fe80::/10,::1/128"
       - name: PDI_SSO_CLIENT_ID
         valueFrom:
           secretKeyRef:
