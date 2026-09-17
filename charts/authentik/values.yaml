@@ -4,6 +4,11 @@
 scaleway:
   secretId: "1433c432-475f-48c9-b38a-7da12faaf89d"
 
+# Managed PostgreSQL endpoint (Kubernetes Private Network subnet), reached by authentik
+database:
+  cidr: "10.252.0.0/20"
+  port: 5432
+
 authentik:
   authentik:
     error_reporting:
@@ -50,11 +55,34 @@ authentik:
           secretKeyRef:
             name: authentik-secrets
             key: secret_key
+      # PostgreSQL connection to the shared managed RDB (emplois-cnav-postgresql),
+      # synced from Scaleway Secret Manager into the authentik-database Secret by the
+      # authentik-database ExternalSecret (host/port/name + user/password).
+      - name: AUTHENTIK_POSTGRESQL__HOST
+        valueFrom:
+          secretKeyRef:
+            name: authentik-database
+            key: host
+      - name: AUTHENTIK_POSTGRESQL__PORT
+        valueFrom:
+          secretKeyRef:
+            name: authentik-database
+            key: port
+      - name: AUTHENTIK_POSTGRESQL__NAME
+        valueFrom:
+          secretKeyRef:
+            name: authentik-database
+            key: name
+      - name: AUTHENTIK_POSTGRESQL__USER
+        valueFrom:
+          secretKeyRef:
+            name: authentik-database
+            key: user
       - name: AUTHENTIK_POSTGRESQL__PASSWORD
         valueFrom:
           secretKeyRef:
-            name: authentik-secrets
-            key: postgres_password
+            name: authentik-database
+            key: password
       # 2026.8: authentik only trusts X-Forwarded-* headers from these CIDRs.
       # Refs: https://docs.goauthentik.io/install-config/reverse-proxy/#trusted-proxy-networks
       # Cluster pods are in 100.64.0.0/10 (Cilium/Scaleway CGNAT range)
@@ -84,17 +112,7 @@ authentik:
             name: authentik-secrets
             key: bootstrap_admin_email
 
+  # The bundled PostgreSQL subchart is disabled: authentik now uses the shared managed
+  # RDB (emplois-cnav-postgresql), configured through the AUTHENTIK_POSTGRESQL__* env above.
   postgresql:
-    enabled: true
-    image:
-      tag: "17"
-    auth:
-      username: authentik
-      database: authentik
-      existingSecret: authentik-secrets
-      secretKeys:
-        userPasswordKey: postgres_password
-    primary:
-      persistence:
-        enabled: true
-        existingClaim: authentik-postgresql-data
+    enabled: false
