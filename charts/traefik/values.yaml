@@ -1,0 +1,65 @@
+# Traefik wrapper chart values
+
+traefik:
+  deployment:
+    replicas: 1
+    initContainers:
+      - name: volume-permissions
+        image: busybox:latest
+        command: ["sh", "-c", "touch /data/acme.json && chmod 600 /data/acme.json && chown 65532:65532 /data/acme.json"]
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+          runAsNonRoot: false
+        volumeMounts:
+          - name: data
+            mountPath: /data
+
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/scw-loadbalancer-forward-port-algorithm: roundrobin
+      service.beta.kubernetes.io/scw-loadbalancer-id: "fr-par-1/06893cb9-d7bc-4b9b-b477-b037d2ae45b0"
+      # Wrap backend connections in PROXY protocol v2 so Traefik gets the real client IP (needed by the
+      # API ipAllowList). The entrypoints below MUST trust it (proxyProtocol.trustedIPs) or all traffic breaks.
+      service.beta.kubernetes.io/scw-loadbalancer-proxy-protocol-v2: "*"
+
+  providers:
+    kubernetesCRD:
+      enabled: true
+      allowCrossNamespace: true
+    kubernetesIngress:
+      enabled: true
+
+  ingressClass:
+    enabled: true
+    isDefaultClass: true
+
+  ports:
+    web:
+      # Trust the PROXY protocol header from the LB (Kubernetes Private Network)
+      proxyProtocol:
+        trustedIPs:
+          - 10.252.0.0/20
+      http:
+        redirections:
+          entryPoint:
+            to: websecure
+            scheme: https
+    websecure:
+      proxyProtocol:
+        trustedIPs:
+          - 10.252.0.0/20
+      http:
+        tls:
+          enabled: true
+
+  additionalArguments:
+    - "--certificatesresolvers.letsencrypt.acme.email=tech@inclusion.gouv.fr"
+    - "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json"
+    - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: scw-bssd

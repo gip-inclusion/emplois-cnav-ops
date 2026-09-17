@@ -1,0 +1,16 @@
+apiVersion: v2
+name: authentik
+description: Authentik identity provider for emplois-cnav
+type: application
+version: 0.1.0
+appVersion: "2026.8.2"
+keywords:
+  - authentik
+  - identity
+  - authentication
+maintainers:
+  - name: GIP Inclusion
+dependencies:
+  - name: authentik
+    version: "2026.8.2"
+    repository: https://charts.goauthentik.io

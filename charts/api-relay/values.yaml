@@ -1,0 +1,93 @@
+# Default values for api-relay
+# Single image for all services: DJANGO_SERVICE selects what a pod serves (BACKOFFICE/API)
+
+# integration | production, set by the per-environment values file (drives the Secret Manager names)
+environment: ""
+
+replicaCount: 1
+
+image:
+  repository: rg.fr-par.scw.cloud/emplois-cnav-registry/api-relay
+  pullPolicy: Always
+  tag: "latest"
+
+imagePullSecrets:
+  - name: scaleway-registry
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+backoffice:
+  # Public hostname of the backoffice: drives DJANGO_ALLOWED_HOSTS, DJANGO_CSRF_TRUSTED_ORIGINS and the ingress rule
+  host: ""
+  # Where the admin logout redirects (Authentik sign-out), required by the BACKOFFICE service
+  authentikLogoutUrl: ""
+
+api:
+  # Public hostname of the API: drives DJANGO_ALLOWED_HOSTS and the ingress rule
+  host: ""
+  # Source IP ranges allowed to reach the API: Traefik ipAllowList filters before accessing the app
+  # (the API token stays the primary auth)
+  # Set per environment in a SOPS-encrypted values file (helm-secrets)
+  allowedSourceRanges: []
+
+# Both components (backoffice, api) are ClusterIP behind the shared Traefik LB
+service:
+  type: ClusterIP
+  port: 8000
+
+# Shared ingress settings: the per-component router.middlewares annotation is set in each ingress template
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
+
+# Secrets pushed by the infrastructure repository into Secret Manager, synced into the namespace by
+# the External Secrets Operator
+externalSecrets:
+  refreshInterval: "1h"
+  secretStoreName: scaleway
+
+# ArgoCD PreSync Job: django-admin migrate + grant_app_privileges, with the jobs (DDL) credentials
+migrations:
+  enabled: true
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# Extra environment variables passed to the containers
+env: []
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

@@ -1,0 +1,31 @@
+# External Secrets wrapper chart values
+
+scaleway:
+  region: fr-par
+  projectId: "183e4da2-b8da-480b-91ab-72a46e998a25"
+
+# Configuration for ClusterSecretStore
+secretStore:
+  enabled: true
+  name: scaleway
+  # Namespace where scaleway-credentials secret is stored
+  credentialsNamespace: external-secrets
+  # Name of the secret containing Scaleway credentials
+  credentialsSecretName: scaleway-credentials
+
+# External Secrets Operator configuration
+external-secrets:
+  installCRDs: true
+
+  serviceAccount:
+    create: true
+    name: external-secrets
+
+  # Webhook disabled : Kapsule with public_ip_disabled=true prevents
+  # the control plane from reaching webhooks in the private network
+  webhook:
+    create: false
+
+  # Cert controller not needed without webhook
+  certController:
+    create: false

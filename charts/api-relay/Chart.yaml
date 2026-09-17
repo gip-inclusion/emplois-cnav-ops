@@ -1,0 +1,13 @@
+apiVersion: v2
+name: api-relay
+description: Django backoffice / REST API relay for the CNAV interconnection
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - interops
+  - cnav
+  - api
+  - relay
+maintainers:
+  - name: GIP Inclusion

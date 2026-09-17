@@ -1,0 +1,208 @@
+# Allow DNS resolution for all pods
+# Makes every pod egress default-deny
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  description: "Allow DNS resolution for all pods"
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+---
+# Allow Traefik to reach ihm-web
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-traefik-to-ihm-web
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  description: "Allow Traefik to reach ihm-web"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: ihm-web
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: {{ .Values.ingressNamespace }}
+            app.kubernetes.io/name: traefik
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+---
+# Allow Traefik to reach api-relay (both components: backoffice via forward-auth, api via ipAllowList)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-traefik-to-api-relay
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  description: "Allow Traefik to reach api-relay (backoffice and api components)"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: api-relay
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: {{ .Values.ingressNamespace }}
+            app.kubernetes.io/name: traefik
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+---
+# Allow api-relay (api+backoffice pods and migration jobs) to reach the managed PostgreSQL
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-api-relay-egress-to-database
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  description: "Allow api-relay to reach the managed PostgreSQL (Private Network)"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: api-relay
+  egress:
+    - toCIDR:
+        - {{ .Values.database.cidr }}
+      toPorts:
+        - ports:
+            - port: {{ .Values.database.port | quote }}
+              protocol: TCP
+---
+# Allow the api-relay API component to call interops-a (the backoffice never does)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-api-relay-to-interops-a
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  description: "Allow the api-relay API component to call interops-a"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: interops-a
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: api-relay
+            app.kubernetes.io/component: api
+      toPorts:
+        - ports:
+            - port: "8081"
+              protocol: TCP
+---
+# Allow the api-relay API component to call interops-a
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-api-relay-egress-to-interops-a
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  description: "Allow the api-relay API component to call interops-a (egress)"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: api-relay
+      app.kubernetes.io/component: api
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: interops-a
+      toPorts:
+        - ports:
+            - port: "8081"
+              protocol: TCP
+---
+# Allow interops-a to call jetonv3
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-interops-a-to-jetonv3
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  description: "Allow interops-a to call jetonv3"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: jetonv3
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: interops-a
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP
+---
+# Allow interops-a to call jetonv3
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-interops-a-egress-to-jetonv3
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  description: "Allow interops-a to call jetonv3 (egress)"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: interops-a
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: jetonv3
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP
+---
+{{- $vpnSecret := lookup "v1" "Secret" (include "interops.namespace" .) "vpn-config" }}
+{{- $strongswanIP := "" }}
+{{- if $vpnSecret }}
+{{- $strongswanIP = index $vpnSecret.data "local_ip" | b64dec }}
+{{- end }}
+{{- if $strongswanIP }}
+# Allow interops-a to reach strongswan
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-interops-a-to-strongswan
+  namespace: {{ include "interops.namespace" . }}
+  labels:
+    {{- include "interops.labels" . | nindent 4 }}
+spec:
+  description: "Allow interops-a to reach strongswan"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: interops-a
+  egress:
+    - toCIDR:
+        - {{ $strongswanIP }}/32
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+{{- end }}

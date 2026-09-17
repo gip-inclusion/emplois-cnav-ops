@@ -1,0 +1,38 @@
+# Default values for interops namespace chart
+
+# Environment name (integration or production)
+environment: ""
+
+# External Secrets configuration
+externalSecrets:
+  enabled: true
+  refreshInterval: "1h"
+  secretStoreName: scaleway
+  # Scaleway Secret Manager ID for cnav-vpn-config
+  remoteSecretId: a79ba102-264a-40df-99b4-59447cfc514b
+
+# PVC configuration
+pvc:
+  # Shared config volume (rw for ihm-web, ro for jetonv3 and interops-a)
+  config:
+    size: 1Gi
+    storageClass: scw-bssd
+  # Separate audit volumes per app (Scaleway doesn't support ReadWriteMany)
+  audit:
+    ihmWeb:
+      size: 10Gi
+      storageClass: scw-bssd
+    jetonv3:
+      size: 10Gi
+      storageClass: scw-bssd
+    interopsA:
+      size: 10Gi
+      storageClass: scw-bssd
+
+# Ingress namespace name (where Traefik runs)
+ingressNamespace: ingress
+
+# Managed PostgreSQL endpoint (Kubernetes Private Network subnet), reached by api-relay
+database:
+  cidr: "10.252.0.0/20"
+  port: 5432
