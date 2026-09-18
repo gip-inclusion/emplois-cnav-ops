@@ -7,7 +7,12 @@ metadata:
     {{- include "api-relay.labels" . | nindent 4 }}
     app.kubernetes.io/component: migrations
   annotations:
-    # Run before every ArgoCD sync (the previous job is kept for inspection until the next one)
+    # Manual helm: run in a re-runnable pre-upgrade/pre-install hook.
+    # before-hook-creation deletes the previous Job first, to avoid the immutable-pod-template conflict.
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    # ArgoCD: run before every sync (the previous job is kept for inspection until the next one)
     argocd.argoproj.io/hook: PreSync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:

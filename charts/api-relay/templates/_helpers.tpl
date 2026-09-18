@@ -92,6 +92,16 @@ The database user/password differ per pod and are set by each template
     secretKeyRef:
       name: api-relay-database
       key: name
+- name: DJANGO_INTEROPS_BASE_URL
+  value: {{ required "interops.baseUrl must be set (SOPS values-<env>.enc.yaml)" .Values.interops.baseUrl | quote }}
+- name: DJANGO_INTEROPS_ORGANIZATION_CODE
+  value: {{ required "interops.organizationCode must be set (SOPS values-<env>.enc.yaml)" .Values.interops.organizationCode | quote }}
+- name: DJANGO_INTEROPS_ORGANIZATION_LABEL
+  value: {{ required "interops.organizationLabel must be set (SOPS values-<env>.enc.yaml)" .Values.interops.organizationLabel | quote }}
+- name: DJANGO_INTEROPS_SUBJECT_ID
+  value: {{ required "interops.subjectId must be set (SOPS values-<env>.enc.yaml)" .Values.interops.subjectId | quote }}
+- name: DJANGO_INTEROPS_IDENTITY_PATH
+  value: {{ required "interops.identityPath must be set (SOPS values-<env>.enc.yaml)" .Values.interops.identityPath | quote }}
 {{- end }}
 
 {{/*

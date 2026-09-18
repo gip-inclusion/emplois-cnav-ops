@@ -51,6 +51,13 @@ api:
   # Set per environment in a SOPS-encrypted values file (helm-secrets)
   allowedSourceRanges: []
 
+# InterOPS connection settings.
+# Only baseUrl is plaintext (internal kube service, not sensitive).
+# The CNAV identifiers (organizationCode/Label, subjectId, identityPath) are provided per environment
+# from the SOPS-encrypted values-<env>.enc.yaml.
+interops:
+  baseUrl: "http://interops-a:8081"
+
 # Both components (backoffice, api) are ClusterIP behind the shared Traefik LB
 service:
   type: ClusterIP
