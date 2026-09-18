@@ -11,6 +11,7 @@
 keys:
   - &francoisfreitag age1tag1q22yv67hk89v390rseukrx3mu5gzw9lpnngla4shn3efhzg2czn7cvdt8y3
   - &leo-naeka       age1q2w07qws7tw5fhcsnxr33z6588exfnu2dpnsqhhqlvyxc0jf750qgrwv5t
+  - &xavfernandez    age1tpm1qdeuratg9kfm728u6kd278g7alwz3n6esmf4szyjcuwgrhqmlt0qg9u33se
 
 creation_rules:
   - path_regex: \.enc\.yaml$
@@ -18,3 +19,4 @@ creation_rules:
       - age:
           - *francoisfreitag
           - *leo-naeka
+          - *xavfernandez
