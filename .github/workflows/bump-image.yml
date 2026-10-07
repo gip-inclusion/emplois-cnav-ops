@@ -1,0 +1,97 @@
+name: Bump image
+
+# Sent by the "Build image" workflow of api-relay-cnav once an image is pushed for a commit of its main branch
+# Open or update a single pull request pinning that image in integration: merging the PR deploys
+on:
+  repository_dispatch:
+    types:
+      - api-relay-image
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-api-relay-integration
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    permissions: {}
+    env:
+      IMAGE_TAG: ${{ github.event.client_payload.tag }}
+      # Branch tracked by ArgoCD: must match the targetRevision anchor of charts/argocd/values.yaml
+      BASE_BRANCH: ${{ vars.ARGOCD_TARGET_REVISION || 'main' }}
+      BUMP_BRANCH: bot/bump-api-relay-integration
+      VALUES_FILE: charts/api-relay/values-integration.yaml
+    steps:
+      - name: Validate the image tag
+        run: |
+          if [[ ! $IMAGE_TAG =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "::error::Invalid image tag (expected a commit SHA): $IMAGE_TAG"
+            exit 1
+          fi
+
+      # The pull request is opened with the App token (not GITHUB_TOKEN) so that the CI runs on it
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.DEPLOY_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.DEPLOY_BOT_PRIVATE_KEY }}
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BASE_BRANCH }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Check the base branch is the one tracked by ArgoCD
+        run: |
+          tracked=$(sed -nE 's/^targetRevision: &targetRevision (.+)$/\1/p' charts/argocd/values.yaml)
+          if [[ $tracked != "$BASE_BRANCH" ]]; then
+            echo "::error::ArgoCD tracks '$tracked', not '$BASE_BRANCH': update the ARGOCD_TARGET_REVISION variable"
+            exit 1
+          fi
+
+      - name: Pin the image tag
+        run: |
+          # Exactly one quoted tag line expected (image.tag)
+          if [[ $(grep -cE '^  tag: "[0-9a-f]+"$' "$VALUES_FILE") -ne 1 ]]; then
+            echo "::error file=$VALUES_FILE::Expected a single 'tag: \"<sha>\"' line under image"
+            exit 1
+          fi
+          sed -i -E "s/^  tag: \"[0-9a-f]+\"$/  tag: \"$IMAGE_TAG\"/" "$VALUES_FILE"
+          git diff
+
+      - name: Open or update the pull request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "Integration already runs $IMAGE_TAG: nothing to do"
+            exit 0
+          fi
+
+          # Commits authored by the App bot user
+          bot_id=$(gh api "/users/${APP_SLUG}[bot]" --jq .id)
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${bot_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+
+          title="chore(api-relay): deploy $IMAGE_TAG in integration"
+          body="Pins the \`api-relay\` image built from gip-inclusion/api-relay-cnav@$IMAGE_TAG in integration.
+          Merging this pull request deploys it: ArgoCD syncs \`$BASE_BRANCH\`.
+
+          Changes: https://github.com/gip-inclusion/api-relay-cnav/compare/$(git show "HEAD:$VALUES_FILE" | sed -nE 's/^  tag: "([0-9a-f]+)"$/\1/p')...$IMAGE_TAG"
+
+          # The branch belongs to the bot: recreated from the base branch at each build, so force-pushed
+          git switch --force-create "$BUMP_BRANCH"
+          git commit --all --message "$title"
+          git push --force origin "$BUMP_BRANCH"
+
+          pull_request=$(gh pr list --head "$BUMP_BRANCH" --base "$BASE_BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [[ -n $pull_request ]]; then
+            gh pr edit "$pull_request" --title "$title" --body "$body"
+          else
+            gh pr create --head "$BUMP_BRANCH" --base "$BASE_BRANCH" --title "$title" --body "$body"
+          fi
