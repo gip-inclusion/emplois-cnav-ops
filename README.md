@@ -226,6 +226,15 @@ en `ContainerCreating` et `helm upgrade --wait` finit en timeout.
 La branche suivie par toutes les Applications est l'ancre `targetRevision` de `charts/argocd/values.yaml` : c'est
 l'**unique** endroit où la changer.
 
+Avant l'install, vérifier ce que la première synchronisation changera sur les ressources déjà déployées à la main
+(`kubectl diff` fait un dry-run côté serveur, rien n'est appliqué) :
+
+```bash
+helm template api-relay ./charts/api-relay -n interops-integration \
+  -f ./charts/api-relay/values-integration.yaml \
+  -f secrets://./charts/api-relay/values-integration.enc.yaml | kubectl diff -n interops-integration -f -
+```
+
 ```bash
 helm dependency update ./charts/argocd
 
