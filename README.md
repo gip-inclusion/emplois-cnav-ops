@@ -53,10 +53,46 @@ Tous ces secrets sont générés/gérés dans le repo [infrastructure](https://g
 
 Les valeurs sensibles mais **non-secrètes** (ex: les ranges d'IPs de l'`ipAllowList` de l'API) sont chiffrées dans
 le repo via **SOPS** (age) : `charts/*/values-<env>.enc.yaml`.
-Elles sont déchiffrées au déploiement via le getter helm-secrets.
+
+helm-secrets les déchiffre au moment où Helm rend le chart : tout fichier de values passé sous la forme
+`-f secrets://<fichier>` est déchiffré à la volée. C'est le cas pour un déploiement manuel comme pour ArgoCD,
+configuré ainsi :
+- Le **repo-server** d'ArgoCD embarque sops + helm-secrets (init container) et l'ApplicationSet `api-relay` référence
+  le fichier chiffré en `secrets://values-<env>.enc.yaml`
+- Il déchiffre avec la **clé AGE du cluster** : sa clé publique est un recipient de `.sops.yaml` (`&argocd`), la clé
+  privée ne vit que dans Scaleway Secret Manager (`argocd-sops-age-key`) et arrive sur le repo-server via
+  l'ExternalSecret `helm-secrets-private-keys`
 
 Après tout ajout/retrait de recipient : `make sops-rotate-keys`. La CI vérifie sans déchiffrer que chaque fichier est
 bien chiffré, pour exactement les recipients de `.sops.yaml` (`.github/scripts/check_sops_files.py`).
+
+#### Recréer ou faire tourner la clé AGE du cluster
+
+Pour un nouveau cluster, ou si la clé privée a fuité.
+La clé privée reste dans une variable du shell, jamais dans un fichier :
+
+```bash
+secret_id=$(scw secret secret list project-id=<emplois-cnav-project-id> name=argocd-sops-age-key -o json | jq -r '.[0].id')
+key=$(age-keygen 2>/dev/null | grep '^AGE-SECRET-KEY-')
+echo "$key" | age-keygen -y    # clé publique : remplace celle de `&argocd` dans .sops.yaml
+scw secret version create secret-id="$secret_id" data="$(jq -nc --arg key "$key" '{age_key: $key}')"
+unset key
+make sops-rotate-keys
+```
+
+Ouvrir une PR avec `.sops.yaml` et les `*.enc.yaml` rechiffrés.
+Une fois mergée, forcer la mise à jour du Secret (`refreshInterval` d'une heure) :
+`kubectl -n argocd annotate externalsecret helm-secrets-private-keys force-sync=$(date +%s) --overwrite`.
+
+Désactiver ensuite l'ancienne version : `scw secret version disable secret-id="$secret_id" revision=<n>`
+
+Vérifier que la clé privée du secret correspond au recipient `&argocd` de `.sops.yaml` :
+
+```bash
+secret_id=$(scw secret secret list project-id=<emplois-cnav-project-id> name=argocd-sops-age-key -o json | jq -r '.[0].id')
+scw secret version access secret-id="$secret_id" revision=latest_enabled -o json \
+  | jq -r '.data' | base64 -d | jq -r '.age_key' | age-keygen -y
+```
 
 ## Identifiants de ressources Scaleway
 
@@ -181,6 +217,11 @@ helm upgrade --install authentik ./charts/authentik --namespace authentik --crea
 ```
 
 #### d) ArgoCD
+
+Prérequis : le secret `argocd-sops-age-key` doit avoir une version activée dans Secret Manager (cf.
+[Recréer ou faire tourner la clé AGE du cluster](#recréer-ou-faire-tourner-la-clé-age-du-cluster)).
+Sans elle, l'ExternalSecret `helm-secrets-private-keys` ne crée pas le Secret monté par le repo-server : le pod reste
+en `ContainerCreating` et `helm upgrade --wait` finit en timeout.
 
 La branche suivie par toutes les Applications est l'ancre `targetRevision` de `charts/argocd/values.yaml` : c'est
 l'**unique** endroit où la changer.
