@@ -2,6 +2,12 @@
 
 environment: integration
 
+image:
+  # Immutable tag: short commit SHA of api-relay-cnav main
+  # Always quoted: an unquoted SHA like 12e4567 is a YAML float
+  tag: "9ae40d6"
+  pullPolicy: IfNotPresent
+
 backoffice:
   host: backoffice.relay.integration.interops-a.inclusion.gouv.fr
   # Sign-out endpoint of the outpost: on the auth host (domain-level forward auth, cf. charts/authentik)
