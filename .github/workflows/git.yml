@@ -1,0 +1,22 @@
+name: Git Checks
+
+# merge_group is also required:
+# The merge queue only merges when every required check reported a status on its own merge commit
+on: [pull_request, merge_group]
+
+jobs:
+  block-fixup:
+    # The commits were already checked on the pull request, and merge_group events have no pull request number:
+    # skipped in the merge queue but counts as a success for the required check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions: {}
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: Detect fixup commits & complain if found
+      run: >
+        ! gh pr view ${{ github.event.pull_request.number }} --json commits  --jq ".commits[].messageHeadline"
+        | grep --regexp '^(amend|fixup|squash)!' --extended-regexp
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
