@@ -6,6 +6,9 @@ charts/*/charts/
 *.kubeconfig
 kubeconfig
 
+# Python (uv)
+.venv/
+
 # IDE
 .idea/
 .vscode/
