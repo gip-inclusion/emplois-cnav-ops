@@ -1,0 +1,8 @@
+# Dependencies of the repository scripts
+[project]
+name = "emplois-cnav-ops"
+version = "0"
+requires-python = ">=3.12"
+dependencies = [
+    "pyyaml>=6.0.3",
+]

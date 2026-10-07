@@ -7,6 +7,7 @@
 #
 # Adding/removing a recipient requires re-wrapping the data key on every encrypted file:
 #   make sops-rotate-keys
+# (checked by: .github/scripts/check_sops_files.py)
 
 keys:
   - &francoisfreitag age1tag1q22yv67hk89v390rseukrx3mu5gzw9lpnngla4shn3efhzg2czn7cvdt8y3
