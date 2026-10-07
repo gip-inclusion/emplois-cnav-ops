@@ -1,0 +1,10 @@
+# Placeholders for the keys of charts/api-relay/values-<environment>.enc.yaml.
+# The CI has no AGE key to decrypt them, and the chart fails to render without these keys
+api:
+  allowedSourceRanges:
+    - 192.0.2.0/24
+interops:
+  organizationCode: 1234
+  organizationLabel: Notre organisation
+  subjectId: urn:interops:1234567890:idp:emplois_cnav
+  identityPath: /PAC-AWSICONSL/AWSICONSL/QAL1/V1
