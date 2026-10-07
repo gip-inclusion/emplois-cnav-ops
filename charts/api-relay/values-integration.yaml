@@ -5,6 +5,7 @@ environment: integration
 image:
   # Immutable tag: short commit SHA of api-relay-cnav main
   # Always quoted: an unquoted SHA like 12e4567 is a YAML float
+  # Bumped by the pull request opened for each new image (.github/workflows/bump-image.yml)
   tag: "9ae40d6"
   pullPolicy: IfNotPresent
 

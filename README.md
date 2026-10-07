@@ -328,6 +328,29 @@ curl -I https://traefik.interops-a.inclusion.gouv.fr
    sur l'Ingress
 2. C'est tout ! Le service se retrouve protégé par le SSO de la PDI
 
+## Déploiement continu (api-relay)
+
+Le cluster n'est pas joignable depuis la CI : elle ne déploie pas, elle **propose** le déploiement dans Git et
+ArgoCD l'applique. La relecture de la pull request est le déclencheur.
+
+1. Merge sur `main` de [api-relay-cnav](https://github.com/gip-inclusion/api-relay-cnav) → une fois sa CI verte, son
+   workflow *Build image* pousse l'image `rg.fr-par.scw.cloud/emplois-cnav-registry/api-relay:<sha court>` (+ `latest`)
+   et envoie un `repository_dispatch` (`api-relay-image`) à ce repo
+2. Le workflow *Bump image* ouvre, ou met à jour, **une unique** pull request `bot/bump-api-relay-integration` qui
+   épingle ce sha dans `charts/api-relay/values-integration.yaml`
+   (`image.tag`, toujours entre guillemets : un sha comme `12e4567` est un float en YAML)
+3. Relecture + merge → ArgoCD synchronise : le Job de migrations puis le rollout
+
+La production sera promue dans un second temps.
+
+Configuration GitHub :
+
+| Où | Nom | Rôle |
+|---|---|---|
+| api-relay-cnav | secret `SCW_REGISTRY_SECRET_KEY` | API key de l'application IAM `emplois-cnav-api-relay-ci` |
+| api-relay-cnav, emplois-cnav-ops | variable `DEPLOY_BOT_CLIENT_ID` (Client ID de l'App, pas son App ID), secret `DEPLOY_BOT_PRIVATE_KEY` | GitHub App installée sur emplois-cnav-ops seulement (Contents + Pull requests en écriture) |
+| emplois-cnav-ops | variable `ARGOCD_TARGET_REVISION` | Branche de base des pull requests : doit valoir l'ancre `targetRevision` (vérifié par le workflow) |
+
 ## Charts Helm
 
 ### interops-infra
