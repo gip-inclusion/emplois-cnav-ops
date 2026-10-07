@@ -333,7 +333,6 @@ argocdapps:
                     - component: ihm-web
                     - component: jetonv3
                     - component: interops-a
-                    - component: api-relay
       template:
         metadata:
           name: "{{component}}-{{environment}}"
@@ -356,15 +355,45 @@ argocdapps:
             namespace: "{{namespace}}"
           # Reloader (reloadStrategy: annotations) triggers rolling updates by patching this pod-template annotation:
           # ArgoCD must ignore it or selfHeal would revert the restart
-          ignoreDifferences:
+          ignoreDifferences: &reloaderIgnoreDifferences
             - group: apps
               kind: Deployment
               jqPathExpressions:
                 - .spec.template.metadata.annotations."reloader.stakater.com/last-reloaded-from"
-          syncPolicy:
+          syncPolicy: &applicationSyncPolicy
             automated:
               prune: true
               selfHeal: true
             syncOptions:
               - CreateNamespace=false
               - RespectIgnoreDifferences=true
+
+    api-relay:
+      namespace: argocd
+      syncPolicy: *applicationSetSyncPolicy
+      generators:
+        - list:
+            elements:
+              # FIXME(leo): add production after VABF
+              - environment: integration
+                namespace: interops-integration
+      template:
+        metadata:
+          name: "api-relay-{{environment}}"
+        spec:
+          project: apps
+          source:
+            repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+            targetRevision: *targetRevision
+            path: charts/api-relay
+            helm:
+              releaseName: api-relay
+              valueFiles:
+                - values.yaml
+                - "values-{{environment}}.yaml"
+                - "secrets://values-{{environment}}.enc.yaml"
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: "{{namespace}}"
+          ignoreDifferences: *reloaderIgnoreDifferences
+          syncPolicy: *applicationSyncPolicy
