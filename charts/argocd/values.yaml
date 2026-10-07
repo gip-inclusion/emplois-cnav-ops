@@ -3,15 +3,100 @@
 # Use a YAML anchor to define, at this unique location, the Git revision tracked by all Application and ApplicationSet
 targetRevision: &targetRevision main
 
+# AGE private key used to decrypt the SOPS values files (helm-secrets)
+# Its public key is a recipient of .sops.yaml; the private key only lives in Scaleway Secret Manager
+sopsAgeKey:
+  # key_value secret created by the infrastructure repository (emplois-cnav/secret-manager), version pushed manually
+  remoteSecretName: argocd-sops-age-key
+  remoteProperty: age_key
+
 argocd:
   # Server configuration
   server:
     service:
       type: ClusterIP
 
+  # helm-secrets (downloader plugin) + sops on the repo-server
+  # With this Applications can reference SOPS-encrypted values files as `secrets://<file>.enc.yaml`
+  # Tools are downloaded by an init container
+  # Refs: https://github.com/jkroepke/helm-secrets/wiki/ArgoCD-Integration
+  repoServer:
+    env:
+      - name: HELM_PLUGINS
+        value: /gitops-tools/helm-plugins/
+      - name: HELM_SECRETS_BACKEND
+        value: sops
+      - name: HELM_SECRETS_SOPS_PATH
+        value: /gitops-tools/sops
+      - name: HELM_SECRETS_DECRYPT_SECRETS_IN_TMP_DIR
+        value: "true"
+      # Restrict value files to the Application directory
+      # Refs; https://github.com/jkroepke/helm-secrets/wiki/Security-in-shared-environments
+      - name: HELM_SECRETS_VALUES_ALLOW_SYMLINKS
+        value: "false"
+      - name: HELM_SECRETS_VALUES_ALLOW_ABSOLUTE_PATH
+        value: "false"
+      - name: HELM_SECRETS_VALUES_ALLOW_PATH_TRAVERSAL
+        value: "false"
+      - name: HELM_SECRETS_KEY_LOCATION_PREFIX
+        value: /helm-secrets-private-keys/
+      - name: SOPS_AGE_KEY_FILE
+        value: /helm-secrets-private-keys/key.txt
+    volumes:
+      - name: gitops-tools
+        emptyDir: {}
+      - name: helm-secrets-private-keys
+        secret:
+          secretName: helm-secrets-private-keys
+    volumeMounts:
+      - name: gitops-tools
+        mountPath: /gitops-tools
+      - name: helm-secrets-private-keys
+        mountPath: /helm-secrets-private-keys/
+        readOnly: true
+    initContainers:
+      - name: download-tools
+        image: alpine:3.22
+        imagePullPolicy: IfNotPresent
+        command: [sh, -euc]
+        env:
+          - name: SOPS_VERSION
+            value: "3.13.3"
+          - name: SOPS_SHA256
+            value: e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
+          - name: HELM_SECRETS_VERSION
+            value: "4.7.9"
+          - name: HELM_SECRETS_SHA256
+            value: bbdfcf121bbbe5e9525f63ed50ad2e07c43034fc3762f488563061620b76b1be
+        args:
+          - |
+            mkdir -p /gitops-tools/helm-plugins
+            wget -qO /gitops-tools/sops "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
+            echo "${SOPS_SHA256}  /gitops-tools/sops" | sha256sum -c
+            chmod +x /gitops-tools/sops
+            wget -qO /gitops-tools/helm-secrets.tar.gz "https://github.com/jkroepke/helm-secrets/releases/download/v${HELM_SECRETS_VERSION}/helm-secrets.tar.gz"
+            echo "${HELM_SECRETS_SHA256}  /gitops-tools/helm-secrets.tar.gz" | sha256sum -c
+            tar -C /gitops-tools/helm-plugins -xzf /gitops-tools/helm-secrets.tar.gz
+            rm /gitops-tools/helm-secrets.tar.gz
+        volumeMounts:
+          - name: gitops-tools
+            mountPath: /gitops-tools
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 999  # argocd user
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+              - ALL
+
   configs:
     cm:
       url: https://argocd.interops-a.inclusion.gouv.fr
+      # Remote values file schemes allowed in Applications (only helm-secrets' plain `secrets://`)
+      helm.valuesFileSchemes: secrets
       # No SSO yet: login via the local admin account (argocd-initial-admin-secret)
       # FIXME(leo): SSO (OIDC) with the PDI Authentik and the group mapping below will come in an upcoming PR
     rbac:
