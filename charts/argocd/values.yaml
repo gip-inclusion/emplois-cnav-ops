@@ -1,7 +1,9 @@
 # ArgoCD wrapper chart values
 
 # Use a YAML anchor to define, at this unique location, the Git revision tracked by all Application and ApplicationSet
-targetRevision: &targetRevision main
+# Use the bootstrap branch for now, to validate it before PR merge
+# FIXME(leo): revert to main once merged
+targetRevision: &targetRevision leo/ops-bootstrap
 
 # AGE private key used to decrypt the SOPS values files (helm-secrets)
 # Its public key is a recipient of .sops.yaml; the private key only lives in Scaleway Secret Manager
