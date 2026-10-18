@@ -31,7 +31,7 @@ emplois-cnav-ops/
 | `reloader` | Stakater Reloader |
 | `ingress` | Traefik (Ingress Controller) |
 | `interops-integration` | Stack InterOPS integration |
-| `interops-production` | Stack InterOPS production |
+| `interops-production` | Stack InterOPS production (après la VABF) |
 
 ## Valeurs sensibles
 
@@ -166,8 +166,8 @@ kubectl create secret generic scaleway-credentials \
   --from-literal=access-key=<SCW_ACCESS_KEY> \
   --from-literal=secret-key=<SCW_SECRET_KEY>
 
-# Secret pour le Container Registry (dans chaque namespace applicatif)
-for ns in interops-integration interops-production; do
+# Secret pour le Container Registry (dans chaque namespace applicatif ; interops-production après la VABF)
+for ns in interops-integration; do
   kubectl create namespace $ns --dry-run=client -o yaml | kubectl apply -f -
   kubectl create secret docker-registry scaleway-registry \
     --namespace=$ns \
@@ -260,8 +260,10 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 ArgoCD se synchronisera automatiquement et déploiera :
 - Lui-même (self-managed)
 - Les composants d'infra restants (Reloader)
-- Les namespaces `interops-integration` et `interops-production` avec leurs PVCs, NetworkPolicies et ExternalSecrets
-- Tous les composants applicatifs (ihm-web, jetonv3, interops-a, api-relay)
+- Le namespace `interops-integration` avec ses PVCs, NetworkPolicies et ExternalSecrets
+- Tous les composants applicatifs (ihm-web, jetonv3, interops-a, api-relay) en intégration
+
+Rien n'est déployé en production avant la VABF (namespace `interops-production` compris).
 
 ### 4. Configuration Authentik (post-déploiement)
 
@@ -362,7 +364,7 @@ Crée le namespace, les PVCs, les ExternalSecrets et les NetworkPolicies pour un
 helm upgrade --install interops-integration ./charts/interops-infra \
   -f ./charts/interops-infra/values-integration.yaml
 
-# Production
+# Production (après la VABF)
 helm upgrade --install interops-production ./charts/interops-infra \
   -f ./charts/interops-infra/values-production.yaml
 ```
@@ -460,6 +462,7 @@ helm upgrade --install reloader ./charts/reloader \
 helm upgrade --install interops-integration ./charts/interops-infra \
   -f ./charts/interops-infra/values-integration.yaml
 
+# Production (après la VABF)
 helm upgrade --install interops-production ./charts/interops-infra \
   -f ./charts/interops-infra/values-production.yaml
 

@@ -150,9 +150,8 @@ argocdapps:
       sourceRepos:
         - https://github.com/gip-inclusion/emplois-cnav-ops.git
       destinations:
+        # FIXME(leo): add interops-production after VABF
         - namespace: interops-integration
-          server: https://kubernetes.default.svc
-        - namespace: interops-production
           server: https://kubernetes.default.svc
       clusterResourceWhitelist:
         - group: ''
@@ -273,6 +272,7 @@ argocdapps:
         syncOptions:
           - CreateNamespace=true
 
+    # FIXME(leo): add interops-production after VABF
     interops-integration:
       namespace: argocd
       project: apps
@@ -294,27 +294,6 @@ argocdapps:
         syncOptions:
           - CreateNamespace=true
 
-    interops-production:
-      namespace: argocd
-      project: apps
-      source:
-        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
-        path: charts/interops-infra
-        targetRevision: *targetRevision
-        helm:
-          valueFiles:
-            - values.yaml
-            - values-production.yaml
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: interops-production
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        syncOptions:
-          - CreateNamespace=true
-
   applicationsets:
     interops-apps:
       namespace: argocd
@@ -326,10 +305,9 @@ argocdapps:
             generators:
               - list:
                   elements:
+                    # FIXME(leo): add production after VABF
                     - environment: integration
                       namespace: interops-integration
-                    - environment: production
-                      namespace: interops-production
               - list:
                   elements:
                     - component: ihm-web
