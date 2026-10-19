@@ -353,6 +353,39 @@ Configuration GitHub :
 | api-relay-cnav, emplois-cnav-ops | variable `DEPLOY_BOT_CLIENT_ID` (Client ID de l'App, pas son App ID), secret `DEPLOY_BOT_PRIVATE_KEY` | GitHub App installée sur emplois-cnav-ops seulement (Contents + Pull requests en écriture) |
 | emplois-cnav-ops | variable `ARGOCD_TARGET_REVISION` | Branche de base des pull requests : doit valoir l'ancre `targetRevision` (vérifié par le workflow) |
 
+## Mise à jour des images InterOPS (ihm-web, jetonv3, interops-a)
+
+Les images InterOPS ne sont pas disponibles sur un registry mais sous la forme d'archives ZIP mises à disposition par
+le GIP MDS, chacune contenant un `.tar.gz` dont l'image est nommée `sj:GIPMDS-2022-sj-<module>-<version>`.
+On les republie dans notre registry avec la date de la version comme tag (`AAAA-MM-JJ`), puis on procède à la MAJ en
+ouvrant une PR qui pin ce tag.
+
+| Module livré | Image sur notre registry |
+|---|---|
+| `sj-ihm-web` | `sj-ihm-web` |
+| `sj-jetonv3` | `sj-jetonv3` |
+| `sj-passerelle-interops-a` | `sj-interops-a` |
+
+```bash
+archives=~/Downloads      # Là où les ZIP ont été décompressés
+version=2026.10.14-1014   # Version livrée, utilisée dans le nom des archives
+tag=2026-10-14            # Tag dans notre registry : calver comme eux (mais au format ISO et sans l'heure)
+
+for module in ihm-web:ihm-web jetonv3:jetonv3 passerelle-interops-a:interops-a; do
+  archive=sj-GIPMDS-2022-sj-${module%%:*}-$version
+  image=rg.fr-par.scw.cloud/emplois-cnav-registry/sj-${module##*:}
+  docker load < $archives/$archive/$archive.tar.gz
+  docker tag sj:${archive#sj-} $image:$tag
+  docker tag sj:${archive#sj-} $image:latest
+  docker push $image:$tag
+  docker push $image:latest
+done
+```
+
+Puis, via une PR, épingler le tag dans `charts/<module-interops>/values-integration.yaml`.
+`latest` suit la dernière livraison mais ne déploie rien : chaque environnement épingle sa version, la production
+rattrape supposément le même tag une fois le déploiement validé en intégration.
+
 ## Charts Helm
 
 ### interops-infra
