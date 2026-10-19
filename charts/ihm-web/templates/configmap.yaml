@@ -16,9 +16,8 @@ data:
     # Replace port 8443 -> 8080
     sed -i 's/port="8443"/port="8080"/g' "$SERVER_XML"
 
-    # Disable SSL
-    sed -i 's/scheme="https"/scheme="http"/g' "$SERVER_XML"
-    sed -i 's/secure="true"/secure="false"/g' "$SERVER_XML"
+    # Disable SSL but keep scheme="https" and secure="true": the client connection is HTTPS (to Traefik),
+    # and ihm-web rejects the requests it sees as plain HTTP (HttpBlockFilter, see commit message)
     sed -i 's/SSLEnabled="true"/SSLEnabled="false"/g' "$SERVER_XML"
 
     # Remove SSL certificate lines (optional, they're ignored when SSLEnabled=false)
