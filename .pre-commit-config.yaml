@@ -1,0 +1,67 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Remove trailing whitespaces
+        args:
+          - --markdown-linebreak-ext=md
+      - id: end-of-file-fixer
+        name: Ensure files ends with a newline
+      - id: check-yaml
+        name: Check YAML files
+        args:
+          - --allow-multiple-documents
+        # Not YAML until rendered: checked by render-charts
+        exclude: ^charts/[^/]+/templates/
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 38bfb07c0c64c304f47eb52090f8288150c77730  # frozen: v0.17.1
+    hooks:
+      - id: ruff-check
+        name: Ruff check
+        args:
+          - --fix
+      - id: ruff-format
+        name: Ruff format
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: a6564f5d57444e123433a5c9af733e3975c77229  # frozen: v0.11.0.1-1
+    hooks:
+      - id: shellcheck
+        name: ShellCheck
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca  # frozen: v1.7.12
+    hooks:
+      - id: actionlint
+        name: Actionlint
+
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: c92afdf2c6ca336aaa8f39e2bd8d48f62dbd8e1f  # frozen: v1.31.1
+    hooks:
+      - id: zizmor
+        name: Zizmor
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 2ca41cc1372d1e939a6a879f18cdc19fc1cac1ce  # frozen: v8.30.0
+    hooks:
+      - id: gitleaks
+        name: Gitleaks
+
+  - repo: local
+    hooks:
+      - id: check-sops-files
+        name: Check the SOPS-encrypted files
+        entry: uv run --locked .github/scripts/check_sops_files.py
+        language: unsupported
+        files: ^(\.sops\.yaml|\.github/scripts/check_sops_files\.py)$|\.enc\.yaml$
+        pass_filenames: false
+
+      # Needs helm, and the chart dependencies built locally (see the README)
+      - id: render-charts
+        name: Lint and render the Helm charts
+        entry: .github/scripts/render_charts.sh
+        language: unsupported
+        files: ^(charts/|\.github/ci/|\.github/scripts/render_charts\.sh$)
+        pass_filenames: false
