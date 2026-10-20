@@ -63,8 +63,9 @@ configuré ainsi :
   privée ne vit que dans Scaleway Secret Manager (`argocd-sops-age-key`) et arrive sur le repo-server via
   l'ExternalSecret `helm-secrets-private-keys`
 
-Après tout ajout/retrait de recipient : `make sops-rotate-keys`. La CI vérifie sans déchiffrer que chaque fichier est
-bien chiffré, pour exactement les recipients de `.sops.yaml` (`.github/scripts/check_sops_files.py`).
+Après tout ajout/retrait de recipient : `make sops-rotate-keys`. Le hook pre-commit `check-sops-files`, lancé aussi par
+la CI, vérifie sans déchiffrer que chaque fichier est bien chiffré, pour exactement les recipients de `.sops.yaml`
+(`.github/scripts/check_sops_files.py`).
 
 #### Recréer ou faire tourner la clé AGE du cluster
 
@@ -120,6 +121,22 @@ faute de pouvoir être résolus au déploiement (ArgoCD rend les charts sans acc
 
 - `kubie` pour gérer les contextes (https://github.com/kubie-org/kubie)
 - `k9s` pour se balader sur le cluster (https://github.com/derailed/k9s)
+
+## Hooks pre-commit
+
+Les hooks de `.pre-commit-config.yaml` tournent à chaque commit une fois installés, et la CI les lance sur tous les
+fichiers :
+
+```bash
+# En local :
+pre-commit install
+```
+
+`check-sops-files` a besoin de `uv` (pour pyyaml), `render-charts` de `helm` et des dépendances des charts construites
+en local (`helm dependency build charts/<chart>`, après un `helm repo add` de leurs repos).
+Pour sauter un hook ponctuellement : `SKIP=render-charts git commit ...`.
+
+Les hooks tiers sont épinglés par SHA de commit (`pre-commit autoupdate --freeze`).
 
 ## Installation
 
