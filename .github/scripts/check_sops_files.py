@@ -12,6 +12,7 @@ YAML is parsed by PyYAML, which handles anchors of .sops.yaml.
 
 import re
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import yaml
@@ -47,7 +48,7 @@ def rule_recipients(rule: dict) -> set[str]:
     return recipients
 
 
-def plaintext_values(node: JSON, unencrypted_suffix: str, location: str = ""):
+def plaintext_values(node: JSON, unencrypted_suffix: str, location: str = "") -> Iterator[str]:
     """
     Yield the location of every value that is not an ENC[...] string
     """
