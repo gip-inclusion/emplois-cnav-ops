@@ -1,0 +1,19 @@
+apiVersion: v2
+name: argocd
+description: ArgoCD GitOps controller for emplois-cnav
+type: application
+version: 0.1.0
+keywords:
+  - argocd
+  - gitops
+maintainers:
+  - name: GIP Inclusion
+dependencies:
+  - name: argo-cd
+    alias: argocd
+    version: "10.10.5"
+    repository: https://argoproj.github.io/argo-helm
+  - name: argocd-apps
+    alias: argocdapps
+    version: 2.0.7
+    repository: https://argoproj.github.io/argo-helm

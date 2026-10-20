@@ -1,0 +1,379 @@
+# ArgoCD wrapper chart values
+
+# Use a YAML anchor to define, at this unique location, the Git revision tracked by all Application and ApplicationSet
+# Use the bootstrap branch for now, to validate it before PR merge
+# FIXME(leo): revert to main once merged
+targetRevision: &targetRevision leo/ops-bootstrap
+
+# AGE private key used to decrypt the SOPS values files (helm-secrets)
+# Its public key is a recipient of .sops.yaml; the private key only lives in Scaleway Secret Manager
+sopsAgeKey:
+  # key_value secret created by the infrastructure repository (emplois-cnav/secret-manager), version pushed manually
+  remoteSecretName: argocd-sops-age-key
+  remoteProperty: age_key
+
+argocd:
+  # Server configuration
+  server:
+    service:
+      type: ClusterIP
+
+  # helm-secrets (downloader plugin) + sops on the repo-server
+  # With this Applications can reference SOPS-encrypted values files as `secrets://<file>.enc.yaml`
+  # Tools are downloaded by an init container
+  # Refs: https://github.com/jkroepke/helm-secrets/wiki/ArgoCD-Integration
+  repoServer:
+    env:
+      - name: HELM_PLUGINS
+        value: /gitops-tools/helm-plugins/
+      - name: HELM_SECRETS_BACKEND
+        value: sops
+      - name: HELM_SECRETS_SOPS_PATH
+        value: /gitops-tools/sops
+      - name: HELM_SECRETS_DECRYPT_SECRETS_IN_TMP_DIR
+        value: "true"
+      # Restrict value files to the Application directory
+      # Refs; https://github.com/jkroepke/helm-secrets/wiki/Security-in-shared-environments
+      - name: HELM_SECRETS_VALUES_ALLOW_SYMLINKS
+        value: "false"
+      - name: HELM_SECRETS_VALUES_ALLOW_ABSOLUTE_PATH
+        value: "false"
+      - name: HELM_SECRETS_VALUES_ALLOW_PATH_TRAVERSAL
+        value: "false"
+      - name: HELM_SECRETS_KEY_LOCATION_PREFIX
+        value: /helm-secrets-private-keys/
+      - name: SOPS_AGE_KEY_FILE
+        value: /helm-secrets-private-keys/key.txt
+    volumes:
+      - name: gitops-tools
+        emptyDir: {}
+      - name: helm-secrets-private-keys
+        secret:
+          secretName: helm-secrets-private-keys
+    volumeMounts:
+      - name: gitops-tools
+        mountPath: /gitops-tools
+      - name: helm-secrets-private-keys
+        mountPath: /helm-secrets-private-keys/
+        readOnly: true
+    initContainers:
+      - name: download-tools
+        image: alpine:3.22
+        imagePullPolicy: IfNotPresent
+        command: [sh, -euc]
+        env:
+          - name: SOPS_VERSION
+            value: "3.13.3"
+          - name: SOPS_SHA256
+            value: e5bec3346a873ae91d871550f3e698c1aad962aff462a080e40f25fde17fef6b
+          - name: HELM_SECRETS_VERSION
+            value: "4.7.9"
+          - name: HELM_SECRETS_SHA256
+            value: bbdfcf121bbbe5e9525f63ed50ad2e07c43034fc3762f488563061620b76b1be
+        args:
+          - |
+            mkdir -p /gitops-tools/helm-plugins
+            wget -qO /gitops-tools/sops "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
+            echo "${SOPS_SHA256}  /gitops-tools/sops" | sha256sum -c
+            chmod +x /gitops-tools/sops
+            wget -qO /gitops-tools/helm-secrets.tar.gz "https://github.com/jkroepke/helm-secrets/releases/download/v${HELM_SECRETS_VERSION}/helm-secrets.tar.gz"
+            echo "${HELM_SECRETS_SHA256}  /gitops-tools/helm-secrets.tar.gz" | sha256sum -c
+            tar -C /gitops-tools/helm-plugins -xzf /gitops-tools/helm-secrets.tar.gz
+            rm /gitops-tools/helm-secrets.tar.gz
+        volumeMounts:
+          - name: gitops-tools
+            mountPath: /gitops-tools
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 999  # argocd user
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+              - ALL
+
+  configs:
+    cm:
+      url: https://argocd.interops-a.inclusion.gouv.fr
+      # Remote values file schemes allowed in Applications (only helm-secrets' plain `secrets://`)
+      helm.valuesFileSchemes: secrets
+      # No SSO yet: login via the local admin account (argocd-initial-admin-secret)
+      # FIXME(leo): SSO (OIDC) with the PDI Authentik and the group mapping below will come in an upcoming PR
+    rbac:
+      # PDI Authentik group "emplois-cnav-admins" is admin, everyone else has no access
+      # Not even read-only: it shows the rendered manifests and live state, including the SOPS values hidden in this
+      # repository (only secret objects are masked)
+      # FIXME(leo): No effect until SSO (OIDC) is setup
+      policy.csv: |
+        g, emplois-cnav-admins, role:admin
+      policy.default: ""
+
+argocdapps:
+  projects:
+    infra:
+      namespace: argocd
+      description: infra resources
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+      sourceRepos:
+        - https://github.com/gip-inclusion/emplois-cnav-ops.git
+      destinations:
+        - namespace: argocd
+          server: https://kubernetes.default.svc
+        - namespace: ingress
+          server: https://kubernetes.default.svc
+        - namespace: external-secrets
+          server: https://kubernetes.default.svc
+        - namespace: authentik
+          server: https://kubernetes.default.svc
+        - namespace: reloader
+          server: https://kubernetes.default.svc
+      clusterResourceWhitelist:
+        - group: "*"
+          kind: "*"
+
+    apps:
+      namespace: argocd
+      description: interops apps
+      # Warn about the resources of the destination namespaces tracked by no Application, such as the ones left by an
+      # Application deleted by its ApplicationSet (preserveResourcesOnDeletion). ArgoCD never deletes them
+      orphanedResources:
+        warn: true
+        ignore:
+          # Created by hand at bootstrap, not by a chart
+          - kind: Secret
+            name: scaleway-registry
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+      sourceRepos:
+        - https://github.com/gip-inclusion/emplois-cnav-ops.git
+      destinations:
+        # FIXME(leo): add interops-production after VABF
+        - namespace: interops-integration
+          server: https://kubernetes.default.svc
+      clusterResourceWhitelist:
+        - group: ''
+          kind: Namespace
+        - group: ''
+          kind: PersistentVolume
+      namespaceResourceWhitelist:
+        - group: cilium.io
+          kind: CiliumNetworkPolicy
+        - group: traefik.io
+          kind: Middleware
+        - group: external-secrets.io
+          kind: ExternalSecret
+        - group: ""
+          kind: Service
+        - group: ""
+          kind: ServiceAccount
+        - group: ""
+          kind: ConfigMap
+        - group: ""
+          kind: PersistentVolumeClaim
+        - group: apps
+          kind: Deployment
+        - group: batch
+          kind: Job
+        - group: networking.k8s.io
+          kind: Ingress
+
+  applications:
+    argocd:
+      namespace: argocd
+      project: infra
+      # ServerSideApply=true switches the diff to a local structured merge, which ignores the CRD defaults
+      # Do the diff with a server-side dry run instead
+      # Refs: https://argo-cd.readthedocs.io/en/stable/user-guide/diff-strategies/#structured-merge-diff
+      additionalAnnotations: &serverSideDiffAnnotations
+        argocd.argoproj.io/compare-options: ServerSideDiff=true
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/argocd
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        syncOptions:
+          # Argo CD >= 3.3: the ApplicationSet CRD is too large for client-side apply
+          # https://github.com/argoproj/argo-cd/blob/master/docs/operator-manual/upgrading/3.2-3.3.md
+          - ServerSideApply=true
+
+    traefik:
+      namespace: argocd
+      project: infra
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/traefik
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: ingress
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+    external-secrets:
+      namespace: argocd
+      project: infra
+      additionalAnnotations: *serverSideDiffAnnotations
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/external-secrets
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: external-secrets
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+
+    reloader:
+      namespace: argocd
+      project: infra
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/reloader
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: reloader
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+    authentik:
+      namespace: argocd
+      project: infra
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/authentik
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: authentik
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+    # FIXME(leo): add interops-production after VABF
+    interops-integration:
+      namespace: argocd
+      project: apps
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/interops-infra
+        targetRevision: *targetRevision
+        helm:
+          valueFiles:
+            - values.yaml
+            - values-integration.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: interops-integration
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+  applicationsets:
+    interops-apps:
+      namespace: argocd
+      # Deleting the ApplicationSet, or an element of its generators, must not delete the deployed resources
+      syncPolicy: &applicationSetSyncPolicy
+        preserveResourcesOnDeletion: true
+      generators:
+        - matrix:
+            generators:
+              - list:
+                  elements:
+                    # FIXME(leo): add production after VABF
+                    - environment: integration
+                      namespace: interops-integration
+              - list:
+                  elements:
+                    - component: ihm-web
+                    - component: jetonv3
+                    - component: interops-a
+      template:
+        metadata:
+          name: "{{component}}-{{environment}}"
+        spec:
+          project: apps
+          source:
+            repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+            targetRevision: *targetRevision
+            path: "charts/{{component}}"
+            helm:
+              # Environment-agnostic release name: resources are named per component (the namespace carries
+              # the environment) and the immutable selector label app.kubernetes.io/instance match
+              # the historical manual helm releases
+              releaseName: "{{component}}"
+              valueFiles:
+                - values.yaml
+                - "values-{{environment}}.yaml"
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: "{{namespace}}"
+          # Reloader (reloadStrategy: annotations) triggers rolling updates by patching this pod-template annotation:
+          # ArgoCD must ignore it or selfHeal would revert the restart
+          ignoreDifferences: &reloaderIgnoreDifferences
+            - group: apps
+              kind: Deployment
+              jqPathExpressions:
+                - .spec.template.metadata.annotations."reloader.stakater.com/last-reloaded-from"
+          syncPolicy: &applicationSyncPolicy
+            automated:
+              prune: true
+              selfHeal: true
+            syncOptions:
+              - CreateNamespace=false
+              - RespectIgnoreDifferences=true
+
+    api-relay:
+      namespace: argocd
+      syncPolicy: *applicationSetSyncPolicy
+      generators:
+        - list:
+            elements:
+              # FIXME(leo): add production after VABF
+              - environment: integration
+                namespace: interops-integration
+      template:
+        metadata:
+          name: "api-relay-{{environment}}"
+        spec:
+          project: apps
+          source:
+            repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+            targetRevision: *targetRevision
+            path: charts/api-relay
+            helm:
+              releaseName: api-relay
+              valueFiles:
+                - values.yaml
+                - "values-{{environment}}.yaml"
+                - "secrets://values-{{environment}}.enc.yaml"
+          destination:
+            server: https://kubernetes.default.svc
+            namespace: "{{namespace}}"
+          ignoreDifferences: *reloaderIgnoreDifferences
+          syncPolicy: *applicationSyncPolicy

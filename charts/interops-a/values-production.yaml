@@ -1,0 +1,11 @@
+# Values for production environment
+
+image:
+  # Pinned tag: images are pushed by hand to the registry, tagged with their date
+  # Always quoted: an unquoted date is a YAML timestamp
+  tag: "2026-10-14"
+  pullPolicy: IfNotPresent
+
+env:
+  - name: ENVIRONMENT
+    value: "production"

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: interops-a
+description: SOAP message processor that forwards requests to CNAV via IPsec tunnel
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - interops
+  - cnav
+  - soap
+  - ipsec
+maintainers:
+  - name: GIP Inclusion

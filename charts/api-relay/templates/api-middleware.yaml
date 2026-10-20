@@ -1,0 +1,19 @@
+{{- if .Values.ingress.enabled -}}
+{{- if not .Values.api.allowedSourceRanges -}}
+{{- fail "api.allowedSourceRanges must be set (SOPS-encrypted per-env values): the API ingress filters source IPs" -}}
+{{- end -}}
+# Source-IP allowlist: filters before the request reaches the app
+# The API token is the primary authentication (this is just a network pre-filter)
+# Ranges live in a SOPS-encrypted per-env values file (helm-secrets).
+# NOTE: PROXY protocol must be enabled on the Traefik LB so sourceRange can see the real client IP behind Scaleway's LB
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "api-relay.fullname" . }}-ipallowlist
+  labels:
+    {{- include "api-relay.labels" . | nindent 4 }}
+spec:
+  ipAllowList:
+    sourceRange:
+      {{- toYaml .Values.api.allowedSourceRanges | nindent 6 }}
+{{- end }}

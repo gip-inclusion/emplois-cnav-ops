@@ -1,0 +1,390 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authentik-blueprints
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: authentik
+data:
+  forward-auth-setup.yaml: |
+    # Authentik Blueprint for Forward Auth configuration
+    # https://docs.goauthentik.io/docs/customize/blueprints
+    version: 1
+    metadata:
+      name: Forward Auth Setup
+      labels:
+        blueprints.goauthentik.io/description: "Configure forward auth for interops-a domain"
+    context: {}
+    entries:
+      # Custom OAuth source property mapping: derive username from email + force email/name.
+      # In 2026.5 OAuth sources have NO default property mappings; username comes from the
+      # hardcoded OpenIDConnectType.get_base_user_properties (nickname|preferred_username), which
+      # PDI SSO does not return.
+      # Empty username causes "select a username" enrollment prompt.
+      # Providing username/email/name here makes first-login enrollment fully automatic.
+      - model: authentik_sources_oauth.oauthsourcepropertymapping
+        id: pdi-sso-user-mapping
+        state: present
+        identifiers:
+          name: PDI SSO - user mapping
+        attrs:
+          name: PDI SSO - user mapping
+          expression: |
+            # `info` is the upstream OIDC userinfo/id_token claims dict.
+            # This is the dedicated authentik at connect.inclusion.gouv.fr (application/o/cnav).
+            # It exposes real given_name + family_name via the `profile` scope.
+            email = info.get("email")
+            given_name = (info.get("given_name") or "").strip()
+            family_name = (info.get("family_name") or "").strip()
+            full_name = (info.get("name") or "").strip() or (given_name + " " + family_name).strip() or email
+            # Group users into folders by email domain (dynamic)
+            domain = email.rsplit("@", 1)[-1] if email and "@" in email else "unknown"
+            return {
+                # username = email (readable in the admin UI). Returning-user matching relies on
+                # the source connection's sub (user_matching_mode: identifier), not on this field.
+                "username": email,
+                "email": email,
+                "name": full_name,
+                # path = virtual "User folder" (overrides the default goauthentik.io/sources/<slug>)
+                # Mapping-provided path wins over user_path_template (set at enrollment)
+                "path": "pdi-sso/" + domain,
+                # The User model has a single `name` field, so keep the individual parts in
+                # attributes (merged, not replaced)
+                # additionalHeaders makes the forward-auth proxy emit them as HTTP headers to backends
+                # (the API relay consumes them for example)
+                # Traefik must also whitelist these header names in the forward-auth middleware's authResponseHeaders
+                "attributes": {
+                    "given_name": given_name,
+                    "family_name": family_name,
+                    "additionalHeaders": {
+                        "X-authentik-given-name": given_name,
+                        "X-authentik-family-name": family_name,
+                    },
+                },
+            }
+
+      # Sync PDI SSO user data on every login (SSO = source of truth)
+      # The default source authentication flow only logs the returning user in
+      # It does not re-apply the property mapping, so attribute changes (and our additionalHeaders) never
+      # refresh after enrollment
+      # But handle_auth() puts the mapping output + the linked user into the flow context
+      # So a user_write stage in the authentication flow re-applies pdi-sso-user-mapping on each login
+      - model: authentik_flows.flow
+        id: pdi-sso-source-auth-flow
+        state: present
+        identifiers:
+          slug: pdi-sso-source-authentication
+        attrs:
+          name: PDI SSO — synchro + login au retour
+          title: Connexion via PDI SSO
+          designation: authentication
+          authentication: none
+
+      - model: authentik_stages_user_write.userwritestage
+        id: pdi-sso-source-user-write
+        state: present
+        identifiers:
+          name: pdi-sso-source-user-write
+        attrs:
+          name: pdi-sso-source-user-write
+          # Update the existing linked user (pending_user is always set on the auth action)
+          # create_when_required degrades gracefully (won't block login) but won't create here
+          # in practice since the user already exists
+          user_creation_mode: create_when_required
+          # Keep PDI SSO users external
+          user_type: external
+
+      # Use its own login stage to avoid a forward reference:
+      # Using pdi-sso-user-login (defined below) wouldn't resolve: the importer only resolves entries defined above
+      - model: authentik_stages_user_login.userloginstage
+        id: pdi-sso-source-user-login
+        state: present
+        identifiers:
+          name: pdi-sso-source-user-login
+        attrs:
+          session_duration: "seconds=0"
+
+      - model: authentik_flows.flowstagebinding
+        id: bind-pdi-sso-source-auth-write
+        state: present
+        identifiers:
+          target: !KeyOf pdi-sso-source-auth-flow
+          stage: !KeyOf pdi-sso-source-user-write
+          order: 10
+        attrs:
+          evaluate_on_plan: true
+
+      - model: authentik_flows.flowstagebinding
+        id: bind-pdi-sso-source-auth-login
+        state: present
+        identifiers:
+          target: !KeyOf pdi-sso-source-auth-flow
+          stage: !KeyOf pdi-sso-source-user-login
+          order: 20
+        attrs:
+          evaluate_on_plan: true
+
+      # PDI SSO OAuth Source (generic OIDC)
+      - model: authentik_sources_oauth.oauthsource
+        id: pdi-sso-source
+        state: present
+        identifiers:
+          slug: pdi-sso
+        attrs:
+          name: PDI SSO
+          provider_type: openidconnect
+          # OIDC auto-discovery: Authentik fetches the well-known doc and fills authorization/token/profile/jwks URLs
+          oidc_well_known_url: !Env [PDI_SSO_WELL_KNOWN_URL, ""]
+          consumer_key: !Env [PDI_SSO_CLIENT_ID, ""]
+          consumer_secret: !Env [PDI_SSO_CLIENT_SECRET, ""]
+          # Use default enrollment flow which properly handles OAuth data mapping
+          enrollment_flow: !Find [authentik_flows.flow, [slug, default-source-enrollment]]
+          # Custom auth flow (defined above) re-runs user_write on every login, so user data + additionalHeaders
+          # are re-synced from PDI SSO each time
+          authentication_flow: !KeyOf pdi-sso-source-auth-flow
+          # Match returning users by their stored source connection (the PDI SSO `sub`), never by email:
+          # an email change updates the existing user instead of creating a duplicate. New identities enrol
+          user_matching_mode: identifier
+          group_matching_mode: identifier
+          # OpenID is implicit (request email + profile claims)
+          additional_scopes: "email profile"
+          enabled: true
+          # Derive username/email/name from PDI SSO claims so enrollment is automatic (no prompt)
+          user_property_mappings:
+            - !KeyOf pdi-sso-user-mapping
+
+      # Proxy Provider (Forward Auth Domain Level)
+      - model: authentik_providers_proxy.proxyprovider
+        id: forward-auth-provider
+        state: present
+        identifiers:
+          name: Forward Auth Domain
+        attrs:
+          authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+          invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
+          mode: forward_domain
+          external_host: https://auth.interops-a.inclusion.gouv.fr
+          cookie_domain: interops-a.inclusion.gouv.fr
+          access_token_validity: hours=2
+
+      # Integration app
+      # A Provider is 1-to-1 with an Application, so only one app can carry the forward-auth provider
+      # In forward_domain mode, that single provider already protects the whole interops-a.inclusion.gouv.fr
+      # cookie domain (both envs + traefik/argocd dashboards), and app's policies are the domain-wide access control
+      - model: authentik_core.application
+        id: interops-admin-integration-app
+        state: present
+        identifiers:
+          slug: interops-admin-integration
+        attrs:
+          name: InterOPS Admin (intégration)
+          provider: !KeyOf forward-auth-provider
+          # "all" so every bound policy must pass (the domain restriction below handles the access control)
+          policy_engine_mode: all
+          meta_launch_url: https://admin.integration.interops-a.inclusion.gouv.fr
+          open_in_new_tab: true
+
+      # Production app (link-only launch tile, no provider)
+      # Auth is enforced by the domain forward-auth provider above (forward_domain covers admin.production.interops-a too)
+      - model: authentik_core.application
+        id: interops-admin-production-app
+        state: present
+        identifiers:
+          slug: interops-admin-production
+        attrs:
+          name: InterOPS Admin (production)
+          policy_engine_mode: all
+          meta_launch_url: https://admin.production.interops-a.inclusion.gouv.fr
+          open_in_new_tab: true
+
+      # Domain-wide access policy: only @inclusion.gouv.fr accounts are authorized
+      # Bound below to the app that carries the forward_domain provider, so it gates every request to the
+      # whole interops-a.inclusion.gouv.fr domain (backoffice, admin, dashboards)
+      - model: authentik_policies_expression.expressionpolicy
+        id: policy-inclusion-domain
+        state: present
+        identifiers:
+          name: restrict-inclusion-gouv-fr
+        attrs:
+          name: restrict-inclusion-gouv-fr
+          execution_logging: false
+          expression: |
+            # Let Authentik superusers (e.g. akadmin) go through
+            if request.user.is_superuser:
+                return True
+            email = (request.user.email or "").lower()
+            if email.endswith("@inclusion.gouv.fr"):
+                return True
+            ak_message("Accès réservé aux comptes @inclusion.gouv.fr.")
+            return False
+
+      # Bind the domain policy to the GATE application (order 0 = evaluated first)
+      - model: authentik_policies.policybinding
+        id: binding-inclusion-domain
+        state: present
+        identifiers:
+          target: !KeyOf interops-admin-integration-app
+          policy: !KeyOf policy-inclusion-domain
+          order: 0
+        attrs:
+          enabled: true
+          negate: false
+          timeout: 30
+
+      # Same domain restriction on the production launch tile: manage tile visibility on the user dashboard
+      # (actual access is enforced by the domain access control above)
+      - model: authentik_policies.policybinding
+        id: binding-inclusion-domain-production
+        state: present
+        identifiers:
+          target: !KeyOf interops-admin-production-app
+          policy: !KeyOf policy-inclusion-domain
+          order: 0
+        attrs:
+          enabled: true
+          negate: false
+          timeout: 30
+
+      # API relay backoffice launch tiles (link-only, no provider): auth is enforced by the domain
+      # forward-auth provider above
+      - model: authentik_core.application
+        id: api-relay-backoffice-integration-app
+        state: present
+        identifiers:
+          slug: api-relay-backoffice-integration
+        attrs:
+          name: API relay backoffice (intégration)
+          policy_engine_mode: all
+          meta_launch_url: https://backoffice.relay.integration.interops-a.inclusion.gouv.fr/admin/
+          open_in_new_tab: true
+
+      - model: authentik_core.application
+        id: api-relay-backoffice-production-app
+        state: present
+        identifiers:
+          slug: api-relay-backoffice-production
+        attrs:
+          name: API relay backoffice (production)
+          policy_engine_mode: all
+          meta_launch_url: https://backoffice.relay.production.interops-a.inclusion.gouv.fr/admin/
+          open_in_new_tab: true
+
+      # Same domain restriction: controls tile visibility on the user dashboard
+      - model: authentik_policies.policybinding
+        id: binding-inclusion-domain-api-relay-integration
+        state: present
+        identifiers:
+          target: !KeyOf api-relay-backoffice-integration-app
+          policy: !KeyOf policy-inclusion-domain
+          order: 0
+        attrs:
+          enabled: true
+          negate: false
+          timeout: 30
+
+      - model: authentik_policies.policybinding
+        id: binding-inclusion-domain-api-relay-production
+        state: present
+        identifiers:
+          target: !KeyOf api-relay-backoffice-production-app
+          policy: !KeyOf policy-inclusion-domain
+          order: 0
+        attrs:
+          enabled: true
+          negate: false
+          timeout: 30
+
+      # Configure Embedded Outpost to use the forward auth provider
+      # Note: use "providers" not "applications" (the UI abstracts this)
+      - model: authentik_outposts.outpost
+        state: present
+        identifiers:
+          name: authentik Embedded Outpost
+        attrs:
+          providers:
+            - !Find [authentik_providers_proxy.proxyprovider, [name, "Forward Auth Domain"]]
+          config:
+            authentik_host: https://auth.interops-a.inclusion.gouv.fr/
+            authentik_host_browser: https://auth.interops-a.inclusion.gouv.fr/
+
+      # Keep the default authentication flow password-only: it is the fallback path for the local akadmin superuser,
+      # reachable directly at /if/flow/default-authentication-flow/
+      # Normal users are auto-redirected to PDI SSO by the dedicated flow below
+      - model: authentik_stages_identification.identificationstage
+        state: present
+        identifiers:
+          name: default-authentication-identification
+        attrs:
+          user_fields:
+            - email
+            - username
+          sources: []
+
+      # Auto-redirect authentication flow: PDI SSO (avoid displaying Authentik login form)
+      - model: authentik_flows.flow
+        id: flow-pdi-sso-redirect
+        state: present
+        identifiers:
+          slug: pdi-sso-authentication
+        attrs:
+          name: PDI SSO — redirection
+          title: Redirection vers PDI SSO
+          designation: authentication
+          authentication: require_unauthenticated
+          denied_action: message_continue
+          policy_engine_mode: any
+          compatibility_mode: false
+
+      # Identification stage with NO user_fields + exactly ONE source
+      # Authentik auto-redirects straight to that source
+      - model: authentik_stages_identification.identificationstage
+        id: ident-pdi-sso-only
+        state: present
+        identifiers:
+          name: pdi-sso-identification
+        attrs:
+          user_fields: []
+          sources:
+            - !KeyOf pdi-sso-source
+          show_source_labels: true
+          case_insensitive_matching: true
+
+      # User Login stage: create the authentik session on return from PDI SSO
+      - model: authentik_stages_user_login.userloginstage
+        id: pdi-sso-user-login
+        state: present
+        identifiers:
+          name: pdi-sso-user-login
+        attrs:
+          session_duration: "seconds=0"
+
+      - model: authentik_flows.flowstagebinding
+        id: bind-pdi-sso-ident
+        state: present
+        identifiers:
+          target: !KeyOf flow-pdi-sso-redirect
+          stage: !KeyOf ident-pdi-sso-only
+          order: 0
+        attrs:
+          evaluate_on_plan: true
+          re_evaluate_policies: true
+
+      - model: authentik_flows.flowstagebinding
+        id: bind-pdi-sso-login
+        state: present
+        identifiers:
+          target: !KeyOf flow-pdi-sso-redirect
+          stage: !KeyOf pdi-sso-user-login
+          order: 10
+        attrs:
+          evaluate_on_plan: true
+
+      # Point the default brand's authentication flow at the auto-redirect flow
+      # NOTE: this is global (every login now bounces to PDI SSO)
+      # For akadmin login: https://auth.interops-a.inclusion.gouv.fr/if/flow/default-authentication-flow/
+      - model: authentik_brands.brand
+        state: present
+        identifiers:
+          domain: authentik-default
+        attrs:
+          flow_authentication: !Find [authentik_flows.flow, [slug, pdi-sso-authentication]]

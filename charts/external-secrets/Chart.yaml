@@ -1,0 +1,15 @@
+apiVersion: v2
+name: external-secrets
+description: External Secrets Operator for emplois-cnav
+type: application
+version: 0.1.0
+keywords:
+  - external-secrets
+  - secrets
+  - scaleway
+maintainers:
+  - name: GIP Inclusion
+dependencies:
+  - name: external-secrets
+    version: "2.13.0"
+    repository: https://charts.external-secrets.io

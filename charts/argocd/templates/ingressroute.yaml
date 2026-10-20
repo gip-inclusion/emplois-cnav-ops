@@ -1,0 +1,30 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: argocd-server
+  namespace: {{ .Release.Namespace }}
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`argocd.interops-a.inclusion.gouv.fr`)
+      kind: Rule
+      services:
+        - name: argocd-server
+          port: 443
+          scheme: https
+          serversTransport: argocd-transport
+      # Authentik forward-auth in front of the local admin login (no SSO yet)
+      middlewares:
+        - name: authentik-forwardauth
+          namespace: authentik
+  tls:
+    certResolver: letsencrypt
+---
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: argocd-transport
+  namespace: {{ .Release.Namespace }}
+spec:
+  insecureSkipVerify: true

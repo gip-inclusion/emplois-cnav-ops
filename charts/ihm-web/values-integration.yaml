@@ -1,0 +1,18 @@
+# Values for integration environment
+
+image:
+  # Pinned tag: images are pushed by hand to the registry, tagged with their date
+  # Always quoted: an unquoted date is a YAML timestamp
+  tag: "2026-10-14"
+  pullPolicy: IfNotPresent
+
+ingress:
+  hosts:
+    - host: admin.integration.interops-a.inclusion.gouv.fr
+      paths:
+        - path: /
+          pathType: Prefix
+
+env:
+  - name: ENVIRONMENT
+    value: "integration"
