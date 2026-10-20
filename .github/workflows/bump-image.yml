@@ -38,11 +38,16 @@ jobs:
         with:
           client-id: ${{ vars.DEPLOY_BOT_CLIENT_ID }}
           private-key: ${{ secrets.DEPLOY_BOT_PRIVATE_KEY }}
+          # Only what the job needs: push the bump branch, open or update its pull request
+          permission-contents: write
+          permission-pull-requests: write
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.BASE_BRANCH }}
           token: ${{ steps.app-token.outputs.token }}
+          # Required to push the bump branch, and the job uploads no artifact
+          persist-credentials: true  # zizmor: ignore[artipacked]
 
       - name: Check the base branch is the one tracked by ArgoCD
         run: |
