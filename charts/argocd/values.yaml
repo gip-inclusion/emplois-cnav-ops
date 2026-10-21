@@ -130,6 +130,8 @@ argocdapps:
           server: https://kubernetes.default.svc
         - namespace: reloader
           server: https://kubernetes.default.svc
+        - namespace: k8s-monitoring
+          server: https://kubernetes.default.svc
       clusterResourceWhitelist:
         - group: "*"
           kind: "*"
@@ -248,6 +250,23 @@ argocdapps:
       destination:
         server: https://kubernetes.default.svc
         namespace: reloader
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+    k8s-monitoring:
+      namespace: argocd
+      project: infra
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/k8s-monitoring
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: k8s-monitoring
       syncPolicy:
         automated:
           prune: true
