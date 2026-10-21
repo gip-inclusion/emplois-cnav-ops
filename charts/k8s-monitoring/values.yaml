@@ -1,0 +1,76 @@
+# Grafana Kubernetes Monitoring wrapper chart values
+
+cockpit:
+  secretId: "e472ceb5-badd-45fe-8de3-ec152200734a"
+  secretName: cockpit-logs-token
+
+k8s-monitoring:
+  cluster:
+    name: emplois-cnav-cluster
+
+  destinations:
+    cockpit-logs:
+      type: loki
+      url: https://937f88f8-aed9-4d10-b536-38d2596cc253.logs.cockpit.fr-par.scw.cloud/loki/api/v1/push
+      secret:
+        # Created by the ExternalSecret of this chart
+        create: false
+        name: cockpit-logs-token
+      # With an existing secret, the chart reads the TLS certificates from it too (ca, cert and key keys, absent here)
+      # Without this block, the system CAs verify the Cockpit certificate
+      tls: null
+
+  # Logs of all the pods (stdout/stderr), read from the node file system
+  podLogsViaLoki:
+    enabled: true
+    collector: alloy-logs
+    # Read a log file without stored position from its start otherwise the first lines of every new container
+    # (new pod, short-lived Job, restart after a crash) are lost until the file is discovered
+    onlyGatherNewLogLines: false
+    # Drop the successful probes of the kubelet, logged at every period by every pod
+    # A failing probe stays logged
+    extraLogProcessingStages: |
+      // Request logs of the applications carrying the user agent of the kubelet (kube-probe/<version>) and a 2xx:
+      // api-relay (Django, "message": "HTTP 200 OK") and authentik ("status": 200)
+      stage.match {
+        selector            = `{namespace=~".+"} |= "kube-probe/" |~ "\"status\":\\s*2\\d\\d|\"HTTP 2\\d\\d "`
+        action              = "drop"
+        drop_counter_reason = "healthcheck"
+      }
+      // api-relay: uWSGI request log of /healthcheck/live/ and /healthcheck/ready/, without user agent
+      stage.drop {
+        expression          = `GET /healthcheck/(live|ready)/ => generated \d+ bytes in \d+ msecs \(HTTP/1\.1 2\d\d\)`
+        drop_counter_reason = "healthcheck"
+      }
+
+  # Logs of the node services (systemd journal, such as the kubelet)
+  nodeLogs:
+    enabled: true
+    collector: alloy-logs
+
+  # Kubernetes events, gathered once for the whole cluster
+  clusterEvents:
+    enabled: true
+    collector: alloy-singleton
+
+  # No metrics destination
+  selfReporting:
+    enabled: false
+
+  collectors:
+    alloy-logs:
+      presets:
+        - filesystem-log-reader
+        - daemonset
+        # Read positions kept on the node (hostPath /var/lib/alloy): a recreated Alloy pod resumes where it stopped,
+        # instead of reading again all the logs still on the node
+        - host-storage
+    alloy-singleton:
+      presets:
+        - singleton
+
+  alloy-operator:
+    waitForAlloyRemoval:
+      # Helm hooks adding a finalizer to the operator after each sync, removed by a pre-delete hook: not worth the risk
+      # of an Application stuck at deletion under ArgoCD
+      enabled: false
