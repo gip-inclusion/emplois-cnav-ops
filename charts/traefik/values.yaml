@@ -62,6 +62,18 @@ traefik:
         tls:
           enabled: true
 
+  # Use JSON logging for faceted search in Grafana Logs Drilldown
+  log:
+    format: json
+  accessLog:
+    enabled: true
+    format: json
+    fields:
+      # Headers are dropped by default: keep it that way (Authorization, Cookie)
+      queryParameters:
+        # Drop the querystring from RequestPath (the redirections of Authentik and ArgoCD may have sensitive values`)
+        defaultMode: drop
+
   additionalArguments:
     - "--certificatesresolvers.letsencrypt.acme.email=tech@inclusion.gouv.fr"
     - "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json"
