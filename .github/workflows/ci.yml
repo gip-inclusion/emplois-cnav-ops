@@ -11,13 +11,13 @@ on:
 permissions: {}
 
 jobs:
-  sops:
-    name: Check SOPS files
+  pre-commit:
+    name: Run the pre-commit hooks
     runs-on: ubuntu-latest
     permissions:
       contents: read
     concurrency:
-      group: ${{ github.workflow }}-sops-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+      group: ${{ github.workflow }}-pre-commit-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -26,21 +26,7 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           enable-cache: true
-      - name: Check they are encrypted, for the recipients of .sops.yaml
-        run: uv run --locked .github/scripts/check_sops_files.py
-
-  charts:
-    name: Check Helm charts
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    concurrency:
-      group: ${{ github.workflow }}-charts-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
-      cancel-in-progress: true
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      # Needed by the render-charts hook
       - name: Build the chart dependencies
         run: |
           set -euo pipefail
@@ -52,5 +38,12 @@ jobs:
             done
             helm dependency build "$chart"
           done
-      - name: Lint and render the charts
-        run: .github/scripts/render_charts.sh
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Run the hooks on all the files
+        env:
+          # The gitleaks hook only scans the staged changes, and GitHub secret scanning covers the pushed commits
+          SKIP: gitleaks
+        run: uv run --locked pre-commit run --all-files --show-diff-on-failure
