@@ -80,6 +80,18 @@ traefik:
         storage: /data/acme.json
         tlsChallenge: true
 
+  # Use JSON logging for faceted search in Grafana Logs Drilldown
+  log:
+    format: json
+  accessLog:
+    enabled: true
+    format: json
+    fields:
+      # Headers are dropped by default: keep it that way (Authorization, Cookie)
+      queryParameters:
+        # Drop the querystring from RequestPath (the redirections of Authentik and ArgoCD may have sensitive values)
+        defaultMode: drop
+
   persistence:
     enabled: true
     size: 1Gi
