@@ -101,6 +101,10 @@ argocd:
       helm.valuesFileSchemes: secrets
       # No SSO yet: login via the local admin account (argocd-initial-admin-secret)
       # FIXME(leo): SSO (OIDC) with the PDI Authentik and the group mapping below will come in an upcoming PR
+    params:
+      # The repo-server is too verbose with a log level at info by default
+      # Increase it to warn and let other components at the global level (info)
+      reposerver.log.level: warn
     rbac:
       # PDI Authentik group "emplois-cnav-admins" is admin, everyone else has no access
       # Not even read-only: it shows the rendered manifests and live state, including the SOPS values hidden in this
