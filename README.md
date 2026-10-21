@@ -16,6 +16,7 @@ emplois-cnav-ops/
 │   ├── interops-a/                 # Traitement et envoi vers CNAV
 │   ├── interops-infra/             # Namespace + PVCs + NetworkPolicies + ExternalSecrets
 │   ├── jetonv3/                    # Signature des messages SOAP
+│   ├── k8s-monitoring/             # Grafana Kubernetes Monitoring (logs du cluster vers Scaleway Cockpit)
 │   ├── reloader/                   # Stakater Reloader (rolling update au changement de secret)
 │   └── traefik/                    # Traefik (wrapper du chart officiel)
 └── README.md
@@ -29,6 +30,7 @@ emplois-cnav-ops/
 | `authentik` | Authentik (SSO, forward-auth) |
 | `external-secrets` | External Secrets Operator |
 | `reloader` | Stakater Reloader |
+| `k8s-monitoring` | Collecteurs Grafana Alloy (logs vers Scaleway Cockpit) |
 | `ingress` | Traefik (Ingress Controller) |
 | `interops-integration` | Stack InterOPS integration |
 | `interops-production` | Stack InterOPS production (après la VABF) |
@@ -46,6 +48,7 @@ via **External Secrets Operator**.
 - `api-relay-database-<env>` : credentials de la base PostgreSQL managée du backoffice.
 - `api-relay-database-connection-<env>` : endpoint de la base PostgreSQL managée du backoffice.
 - `api-relay-django-<env>` : env vars Django sensibles (`SECRET_KEY`, `SECRET_KEY_FALLBACKS`).
+- `cockpit-kubernetes-logs-token` : token de push des logs vers Scaleway Cockpit (cf. section k8s-monitoring).
 
 Tous ces secrets sont générés/gérés dans le repo [infrastructure](https://github.com/gip-inclusion/infrastructure).
 
@@ -108,6 +111,8 @@ faute de pouvoir être résolus au déploiement (ArgoCD rend les charts sans acc
 | Projet `183e4da2-b8da-480b-91ab-72a46e998a25` | `external-secrets` (ClusterSecretStore) | projet `emplois-cnav` |
 | Secret `a79ba102-264a-40df-99b4-59447cfc514b` (cnav-vpn-config) | `interops-infra` (ExternalSecret VPN) | `emplois-cnav/secret-manager` |
 | Secret `1433c432-475f-48c9-b38a-7da12faaf89d` (authentik) | `authentik` (ExternalSecret) | `emplois-cnav/secret-manager` |
+| Secret `e472ceb5-badd-45fe-8de3-ec152200734a` (cockpit-kubernetes-logs-token) | `k8s-monitoring` (ExternalSecret) | `emplois-cnav/secret-manager` |
+| Data source Cockpit `937f88f8-aed9-4d10-b536-38d2596cc253` (Kubernetes Logs) | `k8s-monitoring` (URL de push) | `emplois-cnav/cockpit` |
 | CIDR `10.252.0.0/20` | `interops-infra` (NetworkPolicy egress PostgreSQL) + `traefik` (`proxyProtocol.trustedIPs`) | `emplois-cnav/network` (subnet du Private Network) |
 
 ## Prérequis
@@ -462,6 +467,24 @@ Une seule image Django. `DJANGO_SERVICE` choisit le service servi par chaque pod
   `api-relay-database` / `api-relay-django` / `api-relay-api-token`
 
 #### Migrations : Job ArgoCD PreSync (`migrate` + `grant_app_privileges` avec l'utilisateur DDL `jobs`)
+
+### k8s-monitoring
+
+Envoie les logs du cluster vers la data source « Kubernetes Logs » de **Scaleway Cockpit**.
+Consultation : console Scaleway → Cockpit → Grafana.
+
+- **Collecteurs** : Grafana Alloy, gérés par l'Alloy Operator du chart. Une DaemonSet `alloy-logs` lit les logs de
+  tous les pods (stdout/stderr) et le journal systemd des nœuds (kubelet), un Deployment `alloy-singleton` les
+  événements Kubernetes
+- **Non collectés** : les logs et l'audit des modules InterOPS écrits dans des fichiers
+- **Destination** : Cockpit authentifie les logs avec un token passé comme tenant ID Loki, lu dans le secret
+  `cockpit-kubernetes-logs-token` (clé `token`) via une ExternalSecret
+
+Le token n'est pas géré par Terraform (il serait stocké dans le state).
+Pour le créer ou le faire tourner :
+1. Console Scaleway → Cockpit → Tokens : créer un token en `fr-par`, avec la seule permission de push des logs
+2. Le stocker dans une nouvelle version du secret
+3. L'ExternalSecret le récupère dans l'heure, Alloy relit le secret à chaud
 
 ## NetworkPolicies
 

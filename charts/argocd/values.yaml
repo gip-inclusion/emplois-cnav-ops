@@ -101,6 +101,10 @@ argocd:
       helm.valuesFileSchemes: secrets
       # No SSO yet: login via the local admin account (argocd-initial-admin-secret)
       # FIXME(leo): SSO (OIDC) with the PDI Authentik and the group mapping below will come in an upcoming PR
+    params:
+      # The repo-server is too verbose with a log level at info by default
+      # Increase it to warn and let other components at the global level (info)
+      reposerver.log.level: warn
     rbac:
       # PDI Authentik group "emplois-cnav-admins" is admin, everyone else has no access
       # Not even read-only: it shows the rendered manifests and live state, including the SOPS values hidden in this
@@ -129,6 +133,8 @@ argocdapps:
         - namespace: authentik
           server: https://kubernetes.default.svc
         - namespace: reloader
+          server: https://kubernetes.default.svc
+        - namespace: k8s-monitoring
           server: https://kubernetes.default.svc
       clusterResourceWhitelist:
         - group: "*"
@@ -248,6 +254,23 @@ argocdapps:
       destination:
         server: https://kubernetes.default.svc
         namespace: reloader
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
+    k8s-monitoring:
+      namespace: argocd
+      project: infra
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/k8s-monitoring
+        targetRevision: *targetRevision
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: k8s-monitoring
       syncPolicy:
         automated:
           prune: true
