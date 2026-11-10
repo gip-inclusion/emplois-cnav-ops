@@ -305,6 +305,7 @@ argocdapps:
           valueFiles:
             - values.yaml
             - values-integration.yaml
+            - secrets://values-integration.enc.yaml
       destination:
         server: https://kubernetes.default.svc
         namespace: interops-integration

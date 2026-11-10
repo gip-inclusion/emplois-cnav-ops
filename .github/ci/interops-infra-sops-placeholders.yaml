@@ -1,0 +1,4 @@
+# Placeholders for the keys of charts/interops-infra/values-<environment>.enc.yaml.
+# The CI has no AGE key to decrypt them, and the chart fails to render without these keys
+strongswan:
+  ip: 192.0.2.1

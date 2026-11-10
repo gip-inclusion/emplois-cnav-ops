@@ -32,6 +32,11 @@ pvc:
 # Ingress namespace name (where Traefik runs)
 ingressNamespace: ingress
 
+# Strongswan VM reached by interops-a
+strongswan:
+  # Defined in values-<environment>.enc.yaml (SOPS)
+  ip: ""
+
 # Managed PostgreSQL endpoint (Kubernetes Private Network subnet), reached by api-relay
 database:
   cidr: "10.252.0.0/20"
