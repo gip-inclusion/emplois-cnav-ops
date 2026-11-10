@@ -179,12 +179,6 @@ spec:
             - port: "9090"
               protocol: TCP
 ---
-{{- $vpnSecret := lookup "v1" "Secret" (include "interops.namespace" .) "vpn-config" }}
-{{- $strongswanIP := "" }}
-{{- if $vpnSecret }}
-{{- $strongswanIP = index $vpnSecret.data "local_ip" | b64dec }}
-{{- end }}
-{{- if $strongswanIP }}
 # Allow interops-a to reach strongswan
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -200,9 +194,8 @@ spec:
       app.kubernetes.io/name: interops-a
   egress:
     - toCIDR:
-        - {{ $strongswanIP }}/32
+        - {{ required "strongswan.ip is required (values-<environment>.enc.yaml)" .Values.strongswan.ip }}/32
       toPorts:
         - ports:
             - port: "443"
               protocol: TCP
-{{- end }}

@@ -54,14 +54,14 @@ Tous ces secrets sont générés/gérés dans le repo [infrastructure](https://g
 
 ### Valeurs sensibles chiffrées via SOPS
 
-Les valeurs sensibles mais **non-secrètes** (ex: les ranges d'IPs de l'`ipAllowList` de l'API) sont chiffrées dans
-le repo via **SOPS** (age) : `charts/*/values-<env>.enc.yaml`.
+Les valeurs sensibles mais **non-secrètes** (ex: les ranges d'IPs de l'`ipAllowList` de l'API, l'IP de la VM
+strongSwan) sont chiffrées dans le repo via **SOPS** (age) : `charts/*/values-<env>.enc.yaml`.
 
 helm-secrets les déchiffre au moment où Helm rend le chart : tout fichier de values passé sous la forme
 `-f secrets://<fichier>` est déchiffré à la volée. C'est le cas pour un déploiement manuel comme pour ArgoCD,
 configuré ainsi :
-- Le **repo-server** d'ArgoCD embarque sops + helm-secrets (init container) et l'ApplicationSet `api-relay` référence
-  le fichier chiffré en `secrets://values-<env>.enc.yaml`
+- Le **repo-server** d'ArgoCD embarque sops + helm-secrets (init container), les Applications des charts `api-relay`
+  et `interops-infra` référencent le fichier chiffré en `secrets://values-<env>.enc.yaml`
 - Il déchiffre avec la **clé AGE du cluster** : sa clé publique est un recipient de `.sops.yaml` (`&argocd`), la clé
   privée ne vit que dans Scaleway Secret Manager (`argocd-sops-age-key`) et arrive sur le repo-server via
   l'ExternalSecret `helm-secrets-private-keys`
@@ -409,11 +409,13 @@ Crée le namespace, les PVCs, les ExternalSecrets et les NetworkPolicies pour un
 ```bash
 # Integration
 helm upgrade --install interops-infra-integration ./charts/interops-infra \
-  -f ./charts/interops-infra/values-integration.yaml
+  -f ./charts/interops-infra/values-integration.yaml \
+  -f secrets://./charts/interops-infra/values-integration.enc.yaml
 
 # Production (après la VABF)
 helm upgrade --install interops-infra-production ./charts/interops-infra \
-  -f ./charts/interops-infra/values-production.yaml
+  -f ./charts/interops-infra/values-production.yaml \
+  -f secrets://./charts/interops-infra/values-production.enc.yaml
 ```
 
 ### ihm-web
@@ -527,11 +529,13 @@ helm upgrade --install reloader ./charts/reloader \
 
 # Namespaces + PVCs + NetworkPolicies + ExternalSecrets
 helm upgrade --install interops-infra-integration ./charts/interops-infra \
-  -f ./charts/interops-infra/values-integration.yaml
+  -f ./charts/interops-infra/values-integration.yaml \
+  -f secrets://./charts/interops-infra/values-integration.enc.yaml
 
 # Production (après la VABF)
 helm upgrade --install interops-infra-production ./charts/interops-infra \
-  -f ./charts/interops-infra/values-production.yaml
+  -f ./charts/interops-infra/values-production.yaml \
+  -f secrets://./charts/interops-infra/values-production.enc.yaml
 
 # Applications (exemple pour integration, --create-namespace au besoin)
 helm upgrade --install ihm-web ./charts/ihm-web \
