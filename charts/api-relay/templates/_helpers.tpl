@@ -77,6 +77,10 @@ The database user/password differ per pod and are set by each template
     secretKeyRef:
       name: api-relay-django
       key: secret_key_fallbacks
+# libpq defaults to "prefer", which falls back to plaintext without notice: always encrypt (without verification)
+# Refs: https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-SSLMODE-STATEMENTS
+- name: PGSSLMODE
+  value: require
 - name: DJANGO_DB_HOST
   valueFrom:
     secretKeyRef:
