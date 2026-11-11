@@ -83,6 +83,12 @@ authentik:
           secretKeyRef:
             name: authentik-database
             key: password
+      # The actual default is "disable" (plaintext), not the documented "verify-ca"
+      # Refs: https://docs.goauthentik.io/install-config/configuration/#tlsssl-settings
+      #       https://github.com/goauthentik/authentik/blob/9f3edaa07abf4f0450c3b1f4d93f3d64fdb2bcc2/authentik/lib/default.yml#L24
+      # Always encrypt, without verifying the certificate
+      - name: AUTHENTIK_POSTGRESQL__SSLMODE
+        value: require
       # 2026.8: authentik only trusts X-Forwarded-* headers from these CIDRs.
       # Refs: https://docs.goauthentik.io/install-config/reverse-proxy/#trusted-proxy-networks
       # Cluster pods are in 100.64.0.0/10 (Cilium/Scaleway CGNAT range)
