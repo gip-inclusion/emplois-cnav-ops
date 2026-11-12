@@ -235,9 +235,10 @@ helm dependency update ./charts/argocd
 helm upgrade --install argocd ./charts/argocd --namespace argocd --create-namespace --wait \
   --set argocdapps.projects=null --set argocdapps.applications=null --set argocdapps.applicationsets=null
 
-# 2. Les projets et les Applications, une fois les CRD présents. --reset-values : sans values en argument, Helm
-#    reprendrait celles de l'étape 1
-helm upgrade argocd ./charts/argocd --namespace argocd --reset-values --wait
+# 2. Les projets et les Applications, une fois les CRD présents
+#    --reset-values : sans values en argument, Helm reprendrait celles de l'étape 1
+#    --take-ownership : reprend le projet default, créé par ArgoCD à son démarrage sans les metadata de Helm
+helm upgrade argocd ./charts/argocd --namespace argocd --reset-values --take-ownership --wait
 
 # Récupérer le mot de passe admin initial
 kubectl -n argocd get secret argocd-initial-admin-secret \
