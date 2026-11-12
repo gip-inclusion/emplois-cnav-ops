@@ -189,17 +189,8 @@ helm dependency update ./charts/external-secrets
 helm upgrade --install external-secrets ./charts/external-secrets --namespace external-secrets --create-namespace --wait
 ```
 
-Il reste en attente que tout soit prêt (`--wait`). Dans un autre shell, rajouter les API keys Scaleway afin que
-le secret store passe à l'état `READY` :
-
-```bash
-kubectl create secret generic scaleway-credentials \
-  --namespace external-secrets \
-  --from-literal=access-key=<ACCESS_KEY> \
-  --from-literal=secret-key=<SECRET_KEY>
-```
-
-Possible de vérifier l'état avec `kubectl get clustersecretstore`
+Le secret `scaleway-credentials` existe déjà (cf. 2b) : le secret store doit passer à l'état `READY`
+(`kubectl get clustersecretstore`).
 
 
 #### b) Traefik (Ingress Controller)
