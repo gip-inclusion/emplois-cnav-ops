@@ -65,6 +65,11 @@ traefik:
       forwardedHeaders:
         trustedIPs: []
       http:
+        # Drop the headers whose name aliases another one (ex: X_authentik_uid): uwsgi read it as X-authentik-uid,
+        # while the forward-auth only replaces the canonical form.
+        # Strongly recommended when an entry point fronts a backend normalizing the header names.
+        # https://doc.traefik.io/traefik/security/header-aliases/
+        aliasHeadersStrategy: delete
         tls:
           enabled: true
 
