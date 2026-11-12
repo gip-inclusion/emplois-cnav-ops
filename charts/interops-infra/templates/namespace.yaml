@@ -4,3 +4,6 @@ metadata:
   name: {{ include "interops.namespace" . }}
   labels:
     {{- include "interops.labels" . | nindent 4 }}
+  # Contains the InterOPS data: never deleted by ArgoCD (must delete manually)
+  annotations:
+    argocd.argoproj.io/sync-options: Delete=false
