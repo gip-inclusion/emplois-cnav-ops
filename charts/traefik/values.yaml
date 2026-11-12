@@ -58,6 +58,12 @@ traefik:
       proxyProtocol:
         trustedIPs:
           - 10.252.0.0/20
+      # No upstream HTTP proxy: the default LB backends has forward_protocol=tcp by default.
+      # https://www.scaleway.com/en/developers/api/load-balancer/zoned/~schemas#scaleway-lb-v1-protocol
+      # So trust no X-Forwarded-* sent to this entrypoint: Traefik strips them and sets its own.
+      # Don't include the LB CIDR either: with PROXY protocol, the source address is already the client's one.
+      forwardedHeaders:
+        trustedIPs: []
       http:
         tls:
           enabled: true
