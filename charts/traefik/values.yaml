@@ -62,10 +62,12 @@ traefik:
         tls:
           enabled: true
 
-  additionalArguments:
-    - "--certificatesresolvers.letsencrypt.acme.email=tech@inclusion.gouv.fr"
-    - "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json"
-    - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+  certificatesResolvers:
+    letsencrypt:
+      acme:
+        email: tech@inclusion.gouv.fr
+        storage: /data/acme.json
+        tlsChallenge: true
 
   persistence:
     enabled: true
