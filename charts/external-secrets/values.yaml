@@ -10,7 +10,8 @@ secretStore:
   name: scaleway
   # Namespace where scaleway-credentials secret is stored
   credentialsNamespace: external-secrets
-  # Name of the secret containing Scaleway credentials
+  # Name of the secret containing Scaleway credentials (access-key and secret-key)
+  # Created manually since ESO can't fetch these credentials (cf. README, section 2b)
   credentialsSecretName: scaleway-credentials
 
 # External Secrets Operator configuration
