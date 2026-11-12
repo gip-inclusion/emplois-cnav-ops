@@ -6,6 +6,10 @@ metadata:
 spec:
   forwardAuth:
     address: http://authentik-server.{{ .Release.Namespace }}.svc.cluster.local/outpost.goauthentik.io/auth/traefik
+    # Deprecated but the doc asks to set it to true and to sanitize the X-Forwarded-* at the entrypoint instead
+    # https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/forwardauth/#trustforwardheader
+    # Our entrypoint trusts no upstream proxy (cf. forwardedHeaders in charts/traefik/values.yaml), so every
+    # X-Forwarded-* reaching this middleware was set by Traefik.
     trustForwardHeader: true
     authResponseHeaders:
       - X-authentik-username
