@@ -186,7 +186,7 @@ argocdapps:
       project: infra
       # ServerSideApply=true switches the diff to a local structured merge, which ignores the CRD defaults
       # Do the diff with a server-side dry run instead
-      # Refs: https://argo-cd.readthedocs.io/en/stable/user-guide/diff-strategies/#structured-merge-diff
+      # Refs: https://argo-cd.readthedocs.io/en/stable/user-guide/diff-strategies/
       additionalAnnotations: &serverSideDiffAnnotations
         argocd.argoproj.io/compare-options: ServerSideDiff=true
       source:
