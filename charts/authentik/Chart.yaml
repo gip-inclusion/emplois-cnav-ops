@@ -11,5 +11,5 @@ maintainers:
   - name: GIP Inclusion
 dependencies:
   - name: authentik
-    version: "2026.8.2"
+    version: "2026.8.5"
     repository: https://charts.goauthentik.io
