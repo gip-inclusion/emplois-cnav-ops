@@ -386,11 +386,11 @@ Crée le namespace, les PVCs, les ExternalSecrets et les NetworkPolicies pour un
 
 ```bash
 # Integration
-helm upgrade --install interops-integration ./charts/interops-infra \
+helm upgrade --install interops-infra-integration ./charts/interops-infra \
   -f ./charts/interops-infra/values-integration.yaml
 
 # Production (après la VABF)
-helm upgrade --install interops-production ./charts/interops-infra \
+helm upgrade --install interops-infra-production ./charts/interops-infra \
   -f ./charts/interops-infra/values-production.yaml
 ```
 
@@ -486,11 +486,11 @@ helm upgrade --install reloader ./charts/reloader \
   --create-namespace
 
 # Namespaces + PVCs + NetworkPolicies + ExternalSecrets
-helm upgrade --install interops-integration ./charts/interops-infra \
+helm upgrade --install interops-infra-integration ./charts/interops-infra \
   -f ./charts/interops-infra/values-integration.yaml
 
 # Production (après la VABF)
-helm upgrade --install interops-production ./charts/interops-infra \
+helm upgrade --install interops-infra-production ./charts/interops-infra \
   -f ./charts/interops-infra/values-production.yaml
 
 # Applications (exemple pour integration, --create-namespace au besoin)
