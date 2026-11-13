@@ -1,7 +1,7 @@
 # Default values for api-relay
 # Single image for all services: DJANGO_SERVICE selects what a pod serves (BACKOFFICE/API)
 
-# integration | production, set by the per-environment values file (drives the Secret Manager names)
+# integration | pentest | production, set by the per-environment values file (drives the Secret Manager names)
 environment: ""
 
 replicaCount: 1

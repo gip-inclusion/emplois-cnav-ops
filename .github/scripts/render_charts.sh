@@ -20,13 +20,13 @@ render() {
 for chart in charts/*/; do
   name=$(basename "$chart")
 
-  # Only the InterOPS applications and api-relay are deployed per environment (integration and production)
+  # Only the InterOPS applications and api-relay are deployed per environment
   if [[ ! -f $chart/values-integration.yaml ]]; then
     render "$name" "$name"
     continue
   fi
 
-  for environment in integration production; do
+  for environment in integration pentest production; do
     values=(-f "$chart/values-$environment.yaml")
     if [[ -f $chart/values-$environment.enc.yaml ]]; then
       values+=(-f ".github/ci/$name-sops-placeholders.yaml")
