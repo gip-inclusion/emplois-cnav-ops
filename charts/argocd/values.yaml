@@ -270,8 +270,8 @@ argocdapps:
         syncOptions:
           - CreateNamespace=true
 
-    # FIXME(leo): add interops-production after VABF
-    interops-integration:
+    # FIXME(leo): add interops-infra-production after VABF
+    interops-infra-integration:
       namespace: argocd
       project: apps
       source:
