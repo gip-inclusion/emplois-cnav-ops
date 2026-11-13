@@ -1,6 +1,6 @@
 # Default values for interops namespace chart
 
-# Environment name (integration or production)
+# Environment name (integration, pentest or production)
 environment: ""
 
 # External Secrets configuration
@@ -36,6 +36,9 @@ ingressNamespace: ingress
 strongswan:
   # Defined in values-<environment>.enc.yaml (SOPS)
   ip: ""
+  # Environment of the tunnel IPs read in cnav-vpn-config (local_ip_<environment>, remote_ip_<environment>)
+  # Empty: the environment itself (default applied in templates/externalsecret.yaml)
+  environment: ""
 
 # Managed PostgreSQL endpoint (Kubernetes Private Network subnet), reached by api-relay
 database:
