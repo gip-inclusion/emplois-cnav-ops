@@ -157,6 +157,8 @@ argocdapps:
         # FIXME(leo): add interops-production after VABF
         - namespace: interops-integration
           server: https://kubernetes.default.svc
+        - namespace: interops-pentest
+          server: https://kubernetes.default.svc
       clusterResourceWhitelist:
         - group: ''
           kind: Namespace
@@ -316,6 +318,28 @@ argocdapps:
         syncOptions:
           - CreateNamespace=true
 
+    interops-infra-pentest:
+      namespace: argocd
+      project: apps
+      source:
+        repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
+        path: charts/interops-infra
+        targetRevision: *targetRevision
+        helm:
+          valueFiles:
+            - values.yaml
+            - values-pentest.yaml
+            - secrets://values-pentest.enc.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: interops-pentest
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+
   applicationsets:
     interops-apps:
       namespace: argocd
@@ -330,6 +354,8 @@ argocdapps:
                     # FIXME(leo): add production after VABF
                     - environment: integration
                       namespace: interops-integration
+                    - environment: pentest
+                      namespace: interops-pentest
               - list:
                   elements:
                     - component: ihm-web
@@ -379,6 +405,8 @@ argocdapps:
               # FIXME(leo): add production after VABF
               - environment: integration
                 namespace: interops-integration
+              - environment: pentest
+                namespace: interops-pentest
       template:
         metadata:
           name: "api-relay-{{environment}}"

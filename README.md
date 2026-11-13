@@ -33,6 +33,7 @@ emplois-cnav-ops/
 | `k8s-monitoring` | Collecteurs Grafana Alloy (logs vers Scaleway Cockpit) |
 | `ingress` | Traefik (Ingress Controller) |
 | `interops-integration` | Stack InterOPS integration |
+| `interops-pentest` | Stack InterOPS du pentest (tunnel strongSwan d'intégration) |
 | `interops-production` | Stack InterOPS production (après la VABF) |
 
 ## Valeurs sensibles
@@ -189,7 +190,7 @@ kubectl create secret generic scaleway-credentials \
   --from-literal=secret-key=<SCW_SECRET_KEY>
 
 # Secret pour le Container Registry (dans chaque namespace applicatif ; interops-production après la VABF)
-for ns in interops-integration; do
+for ns in interops-integration interops-pentest; do
   kubectl create namespace $ns --dry-run=client -o yaml | kubectl apply -f -
   kubectl create secret docker-registry scaleway-registry \
     --namespace=$ns \
@@ -424,6 +425,7 @@ Interface web d'administration permettant de configurer les échanges InterOPS.
 - **Exposition** : Via Traefik (HTTPS avec Let's Encrypt), forward-auth
 - **Domaines** :
   - Integration : `admin.integration.interops-a.inclusion.gouv.fr`
+  - Pentest : `admin.pentest.interops-a.inclusion.gouv.fr`
   - Production : `admin.production.interops-a.inclusion.gouv.fr`
 - **Volumes** : Config (RW), Logs (RW)
 
