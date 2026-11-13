@@ -459,6 +459,8 @@ Pour un retrait voulu, retirer l'élément par une pull request, puis supprimer 
 - un environnement entier : son namespace
 - un composant : ses ressources
 
+Le namespace et les PVC des environnements ont `Delete=false` : ArgoCD ne les supprimera donc jamais lui-même.
+
 Le projet `apps` signale ces ressources restantes (`orphanedResources`) : un avertissement sur les Applications du
 namespace, et la liste dans l'interface. ArgoCD ne les supprime jamais lui-même.
 
