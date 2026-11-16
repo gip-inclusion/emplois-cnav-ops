@@ -172,6 +172,6 @@ API-specific Django env (api deployment)
 - name: DJANGO_HASHED_API_TOKEN
   valueFrom:
     secretKeyRef:
-      name: api-relay-api-token
+      name: {{ printf "api-relay-api-token-%s" .Values.environment }}
       key: hashed_token
 {{- end }}
