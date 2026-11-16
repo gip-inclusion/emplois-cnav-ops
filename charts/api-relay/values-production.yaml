@@ -17,3 +17,4 @@ backoffice:
 api:
   host: relay.production.interops-a.inclusion.gouv.fr
   # api.allowedSourceRanges: set in the SOPS-encrypted values-production.enc.yaml (helm-secrets)
+  replicaCount: 2

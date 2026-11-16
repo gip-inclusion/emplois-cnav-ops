@@ -4,8 +4,6 @@
 # integration | production, set by the per-environment values file (drives the Secret Manager names)
 environment: ""
 
-replicaCount: 1
-
 image:
   repository: rg.fr-par.scw.cloud/emplois-cnav-registry/api-relay
   pullPolicy: Always
@@ -42,6 +40,16 @@ backoffice:
   host: ""
   # Where the admin logout redirects (Authentik sign-out), required by the BACKOFFICE service
   authentikLogoutUrl: ""
+  replicaCount: 1
+  # Gunicorn worker processes per pod (WEB_CONCURRENCY)
+  workers: 2
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
 
 api:
   # Public hostname of the API: drives DJANGO_ALLOWED_HOSTS and the ingress rule
@@ -50,6 +58,16 @@ api:
   # (the API token stays the primary auth)
   # Set per environment in a SOPS-encrypted values file (helm-secrets)
   allowedSourceRanges: []
+  replicaCount: 1
+  # Gunicorn worker processes per pod (WEB_CONCURRENCY)
+  workers: 4
+  resources:
+    limits:
+      cpu: 200m
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 256Mi
 
 # InterOPS connection settings.
 # Only baseUrl is plaintext (internal kube service, not sensitive).
@@ -81,14 +99,13 @@ externalSecrets:
 # ArgoCD PreSync Job: django-admin migrate + grant_app_privileges, with the jobs (DDL) credentials
 migrations:
   enabled: true
-
-resources:
-  limits:
-    cpu: 200m
-    memory: 256Mi
-  requests:
-    cpu: 50m
-    memory: 64Mi
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
 
 # Extra environment variables passed to the containers
 env: []
