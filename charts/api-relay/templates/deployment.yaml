@@ -9,7 +9,7 @@ metadata:
     # Reloader rolls the pods when the synced secrets change
     reloader.stakater.com/auto: "true"
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ .Values.backoffice.replicaCount }}
   selector:
     matchLabels:
       {{- include "api-relay.selectorLabels" . | nindent 6 }}
@@ -45,6 +45,8 @@ spec:
           env:
             {{- include "api-relay.djangoCommonEnv" . | nindent 12 }}
             {{- include "api-relay.backofficeEnv" . | nindent 12 }}
+            - name: WEB_CONCURRENCY
+              value: {{ .Values.backoffice.workers | quote }}
             # The pods serve traffic with the DML-only user
             - name: DJANGO_DB_USER
               valueFrom:
@@ -60,7 +62,7 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.backoffice.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
