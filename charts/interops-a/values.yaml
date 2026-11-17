@@ -69,6 +69,11 @@ strongswan:
   # Defined in values-<environment>.enc.yaml (SOPS)
   ip: ""
 
+# CNAV service called by the gateway, resolved to strongswan.ip
+cnav:
+  # Defined in values-<environment>.enc.yaml (SOPS)
+  hostname: ""
+
 # Environment variables from Kubernetes secret (created by External Secrets)
 envFromSecret:
   enabled: true

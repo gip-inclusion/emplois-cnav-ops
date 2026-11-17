@@ -2,3 +2,5 @@
 # The CI has no AGE key to decrypt them, and the chart fails to render without these keys
 strongswan:
   ip: 192.0.2.1
+cnav:
+  hostname: placeholder.cnavts.fr

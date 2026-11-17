@@ -25,6 +25,11 @@ spec:
       serviceAccountName: {{ include "interops-a.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # Send the gateway's calls to the CNAV hostname through the strongswan VM
+      hostAliases:
+        - ip: {{ required "strongswan.ip is required (values-<environment>.enc.yaml)" .Values.strongswan.ip | quote }}
+          hostnames:
+            - {{ required "cnav.hostname is required (values-<environment>.enc.yaml)" .Values.cnav.hostname | quote }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:

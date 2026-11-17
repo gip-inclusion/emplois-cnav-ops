@@ -440,6 +440,8 @@ Service principal qui reçoit les messages, les fait signer par jetonv3, et les 
 - **Exposition** : Interne uniquement (appelé par api-relay)
 - **Volumes** : Config (RO), Logs (RW)
 - **Egress** : Uniquement vers strongswan (IP spécifique par environnement)
+- **DNS** : la passerelle appelle le service de la CNAV via son hostname, résolu vers la VM strongswan (`hostAliases`),
+  qui le redirige dans le tunnel. Hostname et IP sous SOPS (`cnav.hostname`, `strongswan.ip`)
 
 ### api-relay
 
