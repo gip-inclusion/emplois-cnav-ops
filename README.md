@@ -61,8 +61,9 @@ strongSwan) sont chiffrées dans le repo via **SOPS** (age) : `charts/*/values-<
 helm-secrets les déchiffre au moment où Helm rend le chart : tout fichier de values passé sous la forme
 `-f secrets://<fichier>` est déchiffré à la volée. C'est le cas pour un déploiement manuel comme pour ArgoCD,
 configuré ainsi :
-- Le **repo-server** d'ArgoCD embarque sops + helm-secrets (init container), les Applications des charts `api-relay`
-  et `interops-infra` référencent le fichier chiffré en `secrets://values-<env>.enc.yaml`
+- Le **repo-server** d'ArgoCD embarque sops + helm-secrets (init container), les Applications du chart `api-relay`
+  et des modules InterOPS référencent le fichier chiffré en `secrets://values-<env>.enc.yaml`. Pour les modules
+  InterOPS, le préfixe `?` (`secrets://?values-<env>.enc.yaml`) le rend optionnel : seul interops-a en a un
 - Il déchiffre avec la **clé AGE du cluster** : sa clé publique est un recipient de `.sops.yaml` (`&argocd`), la clé
   privée ne vit que dans Scaleway Secret Manager (`argocd-sops-age-key`) et arrive sur le repo-server via
   l'ExternalSecret `helm-secrets-private-keys`
@@ -410,13 +411,11 @@ Crée le namespace, les PVCs, les ExternalSecrets et les NetworkPolicies pour un
 ```bash
 # Integration
 helm upgrade --install interops-infra-integration ./charts/interops-infra \
-  -f ./charts/interops-infra/values-integration.yaml \
-  -f secrets://./charts/interops-infra/values-integration.enc.yaml
+  -f ./charts/interops-infra/values-integration.yaml
 
 # Production (après la VABF)
 helm upgrade --install interops-infra-production ./charts/interops-infra \
-  -f ./charts/interops-infra/values-production.yaml \
-  -f secrets://./charts/interops-infra/values-production.enc.yaml
+  -f ./charts/interops-infra/values-production.yaml
 ```
 
 ### ihm-web
@@ -489,8 +488,6 @@ Subtilité Cilium à connaître : un pod ne passe en *default-deny* que dès qu'
 or `allow-dns` les sélectionne tous, donc **tout le trafic egress est bloqué par défaut**, et seul les flux
 explicitement déclarés passent (Traefik → apps, api-relay → PostgreSQL / interops-a, interops-a → jetonv3 / strongswan).
 
-Le détail fait foi dans `charts/interops-infra/templates/networkpolicies.yaml`.
-
 ## Retirer un composant ou un environnement
 
 Les ApplicationSets `interops-apps` et `api-relay` ont `preserveResourcesOnDeletion: true` : supprimer un
@@ -531,13 +528,11 @@ helm upgrade --install reloader ./charts/reloader \
 
 # Namespaces + PVCs + NetworkPolicies + ExternalSecrets
 helm upgrade --install interops-infra-integration ./charts/interops-infra \
-  -f ./charts/interops-infra/values-integration.yaml \
-  -f secrets://./charts/interops-infra/values-integration.enc.yaml
+  -f ./charts/interops-infra/values-integration.yaml
 
 # Production (après la VABF)
 helm upgrade --install interops-infra-production ./charts/interops-infra \
-  -f ./charts/interops-infra/values-production.yaml \
-  -f secrets://./charts/interops-infra/values-production.enc.yaml
+  -f ./charts/interops-infra/values-production.yaml
 
 # Applications (exemple pour integration, --create-namespace au besoin)
 helm upgrade --install ihm-web ./charts/ihm-web \
@@ -550,7 +545,8 @@ helm upgrade --install jetonv3 ./charts/jetonv3 \
 
 helm upgrade --install interops-a ./charts/interops-a \
   -n interops-integration \
-  -f ./charts/interops-a/values-integration.yaml
+  -f ./charts/interops-a/values-integration.yaml \
+  -f secrets://./charts/interops-a/values-integration.enc.yaml
 
 helm upgrade --install api-relay ./charts/api-relay \
   -n interops-integration \

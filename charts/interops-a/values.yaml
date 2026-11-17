@@ -64,6 +64,11 @@ volumes:
     mountPath: /home/gipmds/SuiteJeton.audit
     readOnly: false
 
+# Strongswan VM, reached through the egress policy
+strongswan:
+  # Defined in values-<environment>.enc.yaml (SOPS)
+  ip: ""
+
 # Environment variables from Kubernetes secret (created by External Secrets)
 envFromSecret:
   enabled: true
