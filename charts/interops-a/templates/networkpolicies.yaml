@@ -1,0 +1,20 @@
+# Allow interops-a to reach strongswan
+# The other policies of the namespace are in charts/interops-infra/templates/networkpolicies.yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-interops-a-to-strongswan
+  labels:
+    {{- include "interops-a.labels" . | nindent 4 }}
+spec:
+  description: "Allow interops-a to reach strongswan"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: interops-a
+  egress:
+    - toCIDR:
+        - {{ required "strongswan.ip is required (values-<environment>.enc.yaml)" .Values.strongswan.ip }}/32
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

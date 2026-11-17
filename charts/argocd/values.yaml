@@ -307,7 +307,6 @@ argocdapps:
           valueFiles:
             - values.yaml
             - values-integration.yaml
-            - secrets://values-integration.enc.yaml
       destination:
         server: https://kubernetes.default.svc
         namespace: interops-integration
@@ -329,7 +328,6 @@ argocdapps:
           valueFiles:
             - values.yaml
             - values-pentest.yaml
-            - secrets://values-pentest.enc.yaml
       destination:
         server: https://kubernetes.default.svc
         namespace: interops-pentest
@@ -378,6 +376,9 @@ argocdapps:
               valueFiles:
                 - values.yaml
                 - "values-{{environment}}.yaml"
+                # Optional: helm-secrets ignores a missing file prefixed with "?", only interops-a has one
+                # Refs: https://github.com/jkroepke/helm-secrets/wiki/Values#ignore-missing-value-files
+                - "secrets://?values-{{environment}}.enc.yaml"
           destination:
             server: https://kubernetes.default.svc
             namespace: "{{namespace}}"

@@ -34,8 +34,6 @@ ingressNamespace: ingress
 
 # Strongswan VM reached by interops-a
 strongswan:
-  # Defined in values-<environment>.enc.yaml (SOPS)
-  ip: ""
   # Environment of the tunnel IPs read in cnav-vpn-config (local_ip_<environment>, remote_ip_<environment>)
   # Empty: the environment itself (default applied in templates/externalsecret.yaml)
   environment: ""
