@@ -463,7 +463,12 @@ Une seule image Django. `DJANGO_SERVICE` choisit le service servi par chaque pod
 - **Secrets** : credentials DB (user DML-only), `SECRET_KEY` et le **hash** du token API (`HASHED_API_TOKEN`) via
   `api-relay-database` / `api-relay-django` / `api-relay-api-token`
 
-#### Migrations : Job ArgoCD PreSync (`migrate` + `grant_app_privileges` avec l'utilisateur DDL `jobs`)
+#### Migrations : Job ArgoCD (`migrate` + `grant_app_privileges` avec l'utilisateur DDL `jobs`)
+
+Hook `Sync` ordonné par sync waves : ServiceAccount et ExternalSecrets (-1), le Job et les ressources non annotées
+(0, la wave par défaut), puis les Deployments (1).
+ArgoCD attend que chaque wave soit healthy, donc que les secrets soient synchronisés, avant de lancer la suivante.
+Un hook `PreSync` resterait bloqué à la première sync, avant la création du ServiceAccount et des secrets.
 
 ### k8s-monitoring
 

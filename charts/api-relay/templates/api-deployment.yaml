@@ -8,6 +8,8 @@ metadata:
   annotations:
     # Reloader rolls the pods when the synced secrets change
     reloader.stakater.com/auto: "true"
+    # ArgoCD: after the migrations job (wave 0)
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   replicas: {{ .Values.api.replicaCount }}
   selector:
