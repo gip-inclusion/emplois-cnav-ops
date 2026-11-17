@@ -1,5 +1,7 @@
 strongswan:
     ip: ENC[AES256_GCM,data:LSOgTi8LKWQvl18=,iv:YnIayk693yD0xMUiOOTKovEh79Ral2QUcY6E/umedrY=,tag:VXHyKpQOdv7lAsWPifFsMw==,type:str]
+cnav:
+    hostname: ENC[AES256_GCM,data:n3bSG/3rnku6IunYonIDwcyr0owhok0EKO63sH7RXQVr9c6wkeC/7Zo=,iv:DP3z6iDVEPHjQ1/sXQKrKmIu2AvEsbO2c0j9YNHHFjM=,tag:R8usE9GBqF1dzH0DVARIzQ==,type:str]
 sops:
     age:
         - enc: |
@@ -40,7 +42,7 @@ sops:
             bovn4fdqEy+34WXek0dYwIq9GmUXBoXRTKim0lxQNUIDyTt//ijjJaby4Ms=
             -----END AGE ENCRYPTED FILE-----
           recipient: age1tpm1qdeuratg9kfm728u6kd278g7alwz3n6esmf4szyjcuwgrhqmlt0qg9u33se
-    lastmodified: "2026-11-10T23:43:16Z"
-    mac: ENC[AES256_GCM,data:B4LhXYCQvfsLkB3/YQH5ELZ4Mid2zndZKDNBG692ENnEhITkCSR4ifNwGgWwjiJf5Q+Inbvlzb68tny1AiNEK3LMsseGUuoxbPgVxDXZ6i01Ukh6ZpQbY0akat2KquQ6YxxlS2TfAd/QTIFaIcxvE8ctmNhKX7UFoIOlZt2IxHM=,iv:3q6PTrnybXts14HdMs6pyEAfEtnhSYsYsZkORnIDpRU=,tag:O/y0zawreRcbh5Zy4b6tTg==,type:str]
+    lastmodified: "2026-11-17T23:04:16Z"
+    mac: ENC[AES256_GCM,data:uu3hXWINI9vUZbbQVtzkozQW89Fe0KZr20pSfpqSzPs89j6uypcQHjlq5yqB6lveHWqoDkfDp8dtH3WNaZ5/zlKsX12niZG600jT1DAtarjFKoi3rvTVGgkImvBh+EpKduboifBYmD6/6JFzaBu/ki+itgNn+B+718n0WyGPskQ=,iv:bb/hPiTUC26WTsad9/7j+AnBWnRnw4J1WQkF5x/lt/Q=,tag:66ri9yLaSBgIpi8uoj1AHg==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.13.1
