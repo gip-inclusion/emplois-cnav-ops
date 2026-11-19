@@ -1,0 +1,64 @@
+{{- if .Values.rateLimitCleanup.enabled -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "api-relay.fullname" . }}-rate-limit-cleanup
+  labels:
+    {{- include "api-relay.labels" . | nindent 4 }}
+    app.kubernetes.io/component: rate-limit-cleanup
+  annotations:
+    # ArgoCD: after the migrations job (wave 0), which creates the rate limit table
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  # Hourly schedule
+  schedule: "0 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      # With forbidden concurrency, a stuck run would block every following ones
+      activeDeadlineSeconds: 300
+      template:
+        metadata:
+          labels:
+            {{- include "api-relay.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: rate-limit-cleanup
+        spec:
+          restartPolicy: Never
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          serviceAccountName: {{ include "api-relay.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: rate-limit-cleanup
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command:
+                - django-admin
+                - cleanup_obsolete_buckets
+              env:
+                {{- include "api-relay.djangoCommonEnv" . | nindent 16 }}
+                # Service-agnostic command (run under the BACKOFFICE service, like the migrations)
+                {{- include "api-relay.backofficeEnv" . | nindent 16 }}
+                # The DML-only user of the pods is sufficient
+                - name: DJANGO_DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: api-relay-database
+                      key: app_user
+                - name: DJANGO_DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: api-relay-database
+                      key: app_password
+                {{- with .Values.env }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              resources:
+                {{- toYaml .Values.rateLimitCleanup.resources | nindent 16 }}
+{{- end }}

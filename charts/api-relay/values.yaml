@@ -107,6 +107,18 @@ migrations:
       cpu: 50m
       memory: 64Mi
 
+# Hourly CronJob: django-admin cleanup_obsolete_buckets
+# Purge the expired rows of the rate limiter
+rateLimitCleanup:
+  enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
 # Extra environment variables passed to the containers
 env: []
 
