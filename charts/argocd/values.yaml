@@ -183,6 +183,8 @@ argocdapps:
           kind: Deployment
         - group: batch
           kind: Job
+        - group: batch
+          kind: CronJob
         - group: networking.k8s.io
           kind: Ingress
 
