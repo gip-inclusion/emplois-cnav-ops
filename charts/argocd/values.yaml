@@ -287,6 +287,10 @@ argocdapps:
         repoURL: https://github.com/gip-inclusion/emplois-cnav-ops.git
         path: charts/authentik
         targetRevision: *targetRevision
+        helm:
+          valueFiles:
+            - values.yaml
+            - secrets://values.enc.yaml
       destination:
         server: https://kubernetes.default.svc
         namespace: authentik

@@ -1,0 +1,5 @@
+# Placeholders for the keys of charts/authentik/values.enc.yaml.
+# The CI has no AGE key to decrypt them, and the chart fails to render without these keys
+adminLogin:
+  allowedSourceRanges:
+    - 192.0.2.0/24

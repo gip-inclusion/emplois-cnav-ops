@@ -7,6 +7,17 @@ spec:
   entryPoints:
     - websecure
   routes:
+    # Default authentication flow (akadmin password login, PDI SSO users use another flow): admin IPs only
+    # Both its page and the executor API that checks the password, otherwise the API could be called directly
+    - match: >-
+        Host(`auth.interops-a.inclusion.gouv.fr`) && (PathPrefix(`/if/flow/default-authentication-flow`)
+        || PathPrefix(`/api/v3/flows/executor/default-authentication-flow`))
+      kind: Rule
+      middlewares:
+        - name: authentik-admin-login-ipallowlist
+      services:
+        - name: authentik-server
+          port: 80
     - match: Host(`auth.interops-a.inclusion.gouv.fr`)
       kind: Rule
       services:
