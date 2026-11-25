@@ -22,7 +22,11 @@ for chart in charts/*/; do
 
   # Only the InterOPS applications and api-relay are deployed per environment
   if [[ ! -f $chart/values-integration.yaml ]]; then
-    render "$name" "$name"
+    if [[ -f $chart/values.enc.yaml ]]; then
+      render "$name" "$name" -f ".github/ci/$name-sops-placeholders.yaml"
+    else
+      render "$name" "$name"
+    fi
     continue
   fi
 

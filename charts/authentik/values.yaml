@@ -9,6 +9,11 @@ database:
   cidr: "10.252.0.0/20"
   port: 5432
 
+# Source IP ranges allowed to reach the default authentication flow (password login of the local akadmin)
+# Set in the SOPS-encrypted values.enc.yaml (helm-secrets)
+adminLogin:
+  allowedSourceRanges: []
+
 authentik:
   authentik:
     error_reporting:

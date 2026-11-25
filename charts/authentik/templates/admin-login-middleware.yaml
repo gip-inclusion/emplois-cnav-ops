@@ -1,0 +1,15 @@
+{{- if not .Values.adminLogin.allowedSourceRanges -}}
+{{- fail "adminLogin.allowedSourceRanges must be set (SOPS-encrypted values.enc.yaml): the local admin login filters source IPs" -}}
+{{- end -}}
+# Source-IP allowlist on the default authentication flow: the password login of the local akadmin superuser
+# Password + TOTP stay the authentication: this is a network pre-filter against brute force
+# Ranges live in the SOPS-encrypted values.enc.yaml (helm-secrets)
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: authentik-admin-login-ipallowlist
+  namespace: {{ .Release.Namespace }}
+spec:
+  ipAllowList:
+    sourceRange:
+      {{- toYaml .Values.adminLogin.allowedSourceRanges | nindent 6 }}
